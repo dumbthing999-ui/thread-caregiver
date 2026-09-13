@@ -4,10 +4,10 @@ const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const quoteOf = doc => doc?.text.split(/\r?\n/).find(line => line.startsWith('Follow-up appointment:')) || '';
 const timeOf = doc => quoteOf(doc).replace(/^Follow-up appointment:\s*/, '').replace(/\.$/, '');
-const state = {phase:0, busy:false, connected:true, main:null, conflict:null, view:'main', confirmation:null, returnFocus:null, checks:[]};
+const state = {phase:0, busy:false, connected:true, main:null, conflict:null, view:'main', confirmation:null, returnFocus:null, checks:[], mode:'user'};
 const active = () => state.view === 'conflict' ? state.conflict : state.main;
 const messages = [
-  ['START WITH THE SOURCE','A handoff starts with a shared understanding.','Meet Morgan, helping Pat arrange transport. Open the fictional note, then see what happens when the appointment changes.','Open fictional example','You control each step. Nothing runs automatically.'],
+  ['START WITH YOUR SOURCE','Create a handoff from the source you already have.','Paste a fictional appointment note, review the exact wording, and keep transport responsibility connected to its source.','Create a local handoff','The scripted judge walkthrough is available from the sidebar.'],
   ['01 · READ THE ORIGINAL','First, see the wording behind the task.','The appointment is quoted directly from the fictional note. Open the source to see it in context, then record your review.','I’ve reviewed this source','Review records the wording you saw. It is not clinical approval.'],
   ['02 · SHARE THE RESPONSIBILITY','Make it clear who is arranging the ride.','Take responsibility as Morgan. This assigns the transport task; it does not mark a ride as arranged.','I’ll arrange transport','You are acting as a simulated caregiver in this local demo.'],
   ['02 · RECORD YOUR REVIEW','Responsibility and review are separate.','You own the transport task. Acknowledge the exact wording you reviewed so the handoff records which source it depends on.','Acknowledge this wording','An acknowledgement is not task completion.'],
@@ -59,6 +59,7 @@ function render() {
   $('stepLabel').textContent=conflict?'CONFLICT CONTROL':`0${step+1} / 04`;
   [...$('progress').children].forEach((li,i)=>{li.removeAttribute('aria-current'); li.className=i<step?'done':''; if(i===step)li.setAttribute('aria-current','step');});
   $('nextAction').disabled=state.busy||!state.connected;
+  $('modeTag').textContent=state.mode==='demo'?'Judge demo · fictional':'Local workspace';
   $('sourceButton').disabled=!m||state.busy;
   $('historyButton').disabled=!ctx;
   $('exportButton').disabled=!ctx||state.busy||!state.connected;
@@ -124,6 +125,7 @@ async function nextStep() {
   const m=state.main;
   switch(state.phase){
     case 0: {
+      if(state.mode!=='demo'){modal('createDialog');return;}
       // Retain IDs after each accepted step so a later error does not restart a shared case.
       if(!state.main){const result=await request('/api/v1/sessions',{method:'POST',body:{fictional_only:true}});state.main={id:result.case_id,etag:result.etag,history:[]};}
       const ctx=state.main;
@@ -139,12 +141,25 @@ async function nextStep() {
     case 7: showHistory();break;
   }
 }
+async function createUserHandoff() {
+  const text=$('sourceInput').value.trim();
+  const filename=$('sourceFilename').value.trim()||'My appointment note.txt';
+  if(!text)throw new Error('Add the source wording before creating the handoff.');
+  if(!quoteOf({text}))throw new Error('Include a line beginning “Follow-up appointment:” so the appointment can be quoted exactly.');
+  const result=await request('/api/v1/sessions',{method:'POST',body:{fictional_only:true}});
+  state.main={id:result.case_id,etag:result.etag,history:[]};
+  const ctx=state.main;
+  ctx.doc1=(await post(ctx,'/documents',{filename,text,actor_id:'Morgan'})).document;
+  await sync(ctx);state.phase=1;closeModal();showSource(ctx.doc1);notify('Your local handoff is ready. Review the exact source wording to continue.');
+}
 async function confirmAction() {
   const kind=state.confirmation;state.confirmation=null;closeModal();
   if(kind==='replacement'){
     const m=state.main;
     if(!m.linked){m.linked=await post(m,'/replacement-links',{prior_document_id:m.doc1.document_id,new_document_id:m.doc2.document_id,expected_prior_source_version:m.doc1.source_version,expected_new_source_version:m.doc2.source_version,actor_id:'Morgan'},{'If-Match':m.etag});}
     await sync(m);state.phase=6;notify('Replacement recorded. The previous acknowledgement is now stale; its history is preserved.','warning');
+  }else if(kind==='create'){
+    await createUserHandoff();
   }else if(kind==='reset'){
     const ctx=active();await post(ctx,'/reset',{});
     if(state.view==='conflict'){state.conflict=null;state.view='main';}else{state.main=null;state.phase=0;state.checks=[];}
@@ -175,6 +190,7 @@ async function dispatch(action) {
   if(action==='close'){closeModal();return;}
   if(action==='about'){modal('aboutDialog');return;}
   if(action==='history'){showHistory();return;}
+  if(action==='demo'){state.mode='demo';render();notify('Judge demo selected. This opens the scripted fictional example.','warning');return;}
   if(action==='handoff'||action==='return'){state.view='main';render();$('main').focus();return;}
   if(action==='source'){showSource(state.main?.linked?state.main.doc2:state.main?.doc1);return;}
   if(action==='source-old'){showSource(state.main?.doc1);return;}
@@ -182,6 +198,12 @@ async function dispatch(action) {
   if(action==='conflict-a'||action==='conflict-b'){showSource(action==='conflict-a'?state.conflict?.doc_a:state.conflict?.doc_b);return;}
   if(state.busy)return;
   if(action==='reset'){if(!active())return;state.confirmation='reset';$('confirmTitle').textContent='Reset this fictional example?';$('confirmDescription').textContent='This removes this example’s source notes and event history from the local service. Any JSON file you already downloaded remains on your device.';$('confirmAction').textContent='Reset example';modal('confirmDialog');return;}
+  if(action==='create'){
+    state.busy=true;render();
+    try{await createUserHandoff();}catch(error){notify(error.message,'error');}
+    finally{state.busy=false;render();}
+    return;
+  }
   state.busy=true;render();
   try {
     if(action==='next')await nextStep();

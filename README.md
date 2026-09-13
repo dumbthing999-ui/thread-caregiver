@@ -16,7 +16,7 @@ cd thread-caregiver
 python3 run_app.py --port 8000
 ```
 
-Open **http://127.0.0.1:8000/**. The web page is served by Python; opening the HTML file directly will not provide its API.
+Open **http://127.0.0.1:8000/**. The default entry point is a local handoff: paste a fictional source note and review it. The scripted judge walkthrough is behind **Judge demo · scripted example** in the sidebar. The web page is served by Python; opening the HTML file directly will not provide its API.
 
 Optional local SQLite persistence:
 
@@ -28,13 +28,14 @@ The default is in-memory storage. Database files are excluded from Git. Keep the
 
 ## Try the demonstration
 
-1. **Open fictional example.** Read the original source. The appointment quotation is “Follow-up appointment: Thursday at 10:00.” The source viewer shows the literal document and, after review, the service's exact character span.
-2. **Review, then coordinate.** Choose “I’ve reviewed this source,” then “I’ll arrange transport.” Acknowledge the wording as a separate action. Neither action marks the ride completed.
-3. **Compare the new note.** The update contains Friday at 14:00. Adding it does not record a replacement. Inspect both notes and explicitly confirm the claimed replacement relationship.
-4. **See what needs attention.** The old task and acknowledgement become stale. Review and acknowledge the update; inspect history to see the original event retained.
-5. **Check the evidence.** Expand “Explore the demo’s evidence.” Try an old acknowledgement: the service must return `409 STALE_REVISION_ERROR` without adding an event. Retry the original accepted acknowledgement: its ID and event count must remain unchanged.
-6. **Try disagreement.** Open the separate conflicting-note example. Both sources and a neutral clarification question stay visible; the interface does not choose either appointment. Return to the original handoff without losing it.
-7. **Export or reset.** JSON export retains source/version and history information with simulation labels. Reset affects only the current example. Downloaded exports are not removed by reset.
+1. **Select the judge demo.** Click **Judge demo · scripted example** in the sidebar. Ordinary users start with their own local source entry; this control is the only entry to the scripted fictional walkthrough.
+2. **Open fictional example.** Read the original source. The appointment quotation is “Follow-up appointment: Thursday at 10:00.” The source viewer shows the literal document and, after review, the service's exact character span.
+3. **Review, then coordinate.** Choose “I’ve reviewed this source,” then “I’ll arrange transport.” Acknowledge the wording as a separate action. Neither action marks the ride completed.
+4. **Compare the new note.** The update contains Friday at 14:00. Adding it does not record a replacement. Inspect both notes and explicitly confirm the claimed replacement relationship.
+5. **See what needs attention.** The old task and acknowledgement become stale. Review and acknowledge the update; inspect history to see the original event retained.
+6. **Check the evidence.** Expand “Explore the demo’s evidence.” Try an old acknowledgement: the service must return `409 STALE_REVISION_ERROR` without adding an event. Retry the original accepted acknowledgement: its ID and event count must remain unchanged.
+7. **Try disagreement.** Open the separate conflicting-note example. Both sources and a neutral clarification question stay visible; the interface does not choose either appointment. Return to the original handoff without losing it.
+8. **Export or reset.** JSON export retains source/version and history information with simulation labels. Reset affects only the current example. Downloaded exports are not removed by reset.
 
 This is a manual, real-service demonstration. No auto-play success, live AI, clinical authentication or medical advice is presented. Refreshing the page starts a fresh UI view; use export to retain a copy.
 

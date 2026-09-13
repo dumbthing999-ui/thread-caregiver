@@ -36,7 +36,13 @@ async function run() {
     const action=name=>call(`dispatch(${JSON.stringify(name)})`);
     const get=id=>elements.get(id);
 
-    assert.match(get('nextAction').textContent,/Open fictional/);
+    assert.match(get('nextAction').textContent,/Create a local handoff/);
+    await action('next');
+    assert.equal(get('createDialog').open,true,'The default entry point must be a user handoff, not the scripted demo');
+    await action('close');
+    assert.equal(call('state.phase'),0);
+    await action('demo');
+    assert.match(get('modeTag').textContent,/Judge demo/);
     await action('next');await action('close');
     assert.equal(call('state.phase'),1);
     const cid=call('state.main.id');
