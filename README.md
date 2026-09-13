@@ -59,10 +59,14 @@ Verified locally for this revision:
 Reproduce:
 
 ```bash
+make check
+# or run each check explicitly:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py"
 node --check app/ui.js
 node tests/test_ui_flow.js
 ```
+
+`make run` starts the local demo on port 8000. The Makefile is only a convenience; the explicit commands above show exactly what is being run.
 
 Node is optional for running the application; it is required only for the UI-controller test. The controller test uses a minimal DOM adapter and the actual service, **not a real browser**. The connected browser was unavailable during this UI update, so visual rendering, keyboard usability and assistive-technology behavior have not been verified. Test counts describe these tests only, not full contract compliance or production readiness.
 
