@@ -1,0 +1,46 @@
+{
+  "updated_at": "2026-09-13T13:48:00+00:00",
+  "stage": "day04",
+  "title": "System Specification, API Contract & Red Baseline Verification",
+  "planned_agent_hours": 5,
+  "actual_productive_agent_hours": null,
+  "specification_verdict": "ACCEPTED_LOCAL_SPECIFICATION",
+  "red_baseline_verdict": "RED_BASELINE_MATCH_KNOWN_GAPS",
+  "verification_scope": "System specification, API contract, machine-readable contract registry, independent contract review, and reproducible red-baseline execution against unchanged Day 3 code.",
+  "counts": {
+    "required_artifacts_present": 14,
+    "contract_records": 19,
+    "contract_operations": 16,
+    "contract_errors": 16,
+    "red_suite_total_tests": 17,
+    "red_suite_assertion_failures": 12,
+    "red_suite_positive_controls_passed": 5,
+    "red_suite_errors": 0,
+    "red_suite_skips": 0,
+    "functional_requirements_traced": 12,
+    "invariants_traced": 11
+  },
+  "red_suite_summary": {
+    "test_value_must_be_supported_by_its_quote": "FAIL (FR-02, INV-01, INV-09: unsupported value accepted)",
+    "test_empty_instruction_cannot_publish_supported": "FAIL (FR-02, FR-03, INV-01, INV-02: empty fields published)",
+    "test_clinical_category_cannot_spawn_transport": "FAIL (FR-04, INV-08, INV-09: clinical category spawns task)",
+    "test_allowed_task_label_cannot_hide_treatment_action": "FAIL (FR-04, INV-08, INV-09: treatment action under transport label)",
+    "test_duplicate_revision_cannot_overwrite_source_identity": "FAIL (FR-01, FR-06, INV-01: revision re-use replaces identity)",
+    "test_replacement_requires_existing_old_endpoint": "FAIL (FR-05, INV-04: dangling predecessor accepted)",
+    "test_replacement_cannot_point_to_itself": "FAIL (FR-05, INV-04: self-replacement accepted)",
+    "test_idempotency_key_cannot_mask_different_operation": "FAIL (FR-07, INV-07: different operation under same key silent)",
+    "test_idempotency_key_cannot_mask_different_payload": "FAIL (FR-07, INV-07: different payload under same key silent)",
+    "test_history_payload_cannot_be_mutated_by_reader": "FAIL (FR-06, INV-01, INV-05: nested historical payload mutable)",
+    "test_plain_ascii_pdf_is_rejected_by_text_only_importer": "FAIL (FR-01, INV-01: ASCII PDF envelope ingested as text)",
+    "test_service_cannot_create_prohibited_clinical_task": "FAIL (FR-04, INV-08, INV-09: direct service accepts MODIFY_TREATMENT)",
+    "positive_controls": "PASS (5/5 controls: exact anchor, valid transport, missing quote blocked, idempotent deduplication, stale write rejection)"
+  },
+  "unresolved_dependencies": [
+    "Entrant comprehension checkpoint remains pending.",
+    "Entrant eligibility, team and guardian conditions remain unconfirmed.",
+    "Organizer clarification email draft remains pending authorization; not sent.",
+    "No production database, running API service, or live model implemented.",
+    "No real health records or clinical evaluations conducted.",
+    "12 product contract gaps demonstrated by red tests remain unimplemented obligations."
+  ]
+}

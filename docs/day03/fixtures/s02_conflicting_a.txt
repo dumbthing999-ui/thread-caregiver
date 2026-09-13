@@ -1,0 +1,12 @@
+CLINIC CONSULTATION NOTE A
+Patient: Morgan Reed (Fictional Persona - S-02)
+Date: 2026-09-17 09:30
+Source Facility: Westside Family Practice
+Author: Dr. Eleanor Vance
+
+Follow-up appointment: Wednesday at 11:00.
+Clinic Location: Suite 200, Main Building.
+Office Contact: 555-0244.
+
+Caregiver Instructions:
+Arrange transport for Wednesday morning appointment.

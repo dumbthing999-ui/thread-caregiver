@@ -1,0 +1,25 @@
+# Day 2 research brief
+
+Research question: Does inspected public evidence already describe a caregiver workflow joining exact changed source wording, affected nonclinical task dependencies, obsolete version-bound acknowledgements and focused re-review/rehearsal? Is a smaller, testable research contribution still justified against existing tools and a manual checklist?
+
+Verdict: **NARROW**, for the Day 3 feasibility gate only. Broad novelty in sourced education, quizzes, care-plan versions or renewed sign-off is rejected. Demand, usability, fidelity and clinical benefit remain unvalidated. See [analysis](competitor-analysis.md), [matrix](competitor-matrix.csv) and [decision](../decisions/ADR-002-differentiation-gate.md).
+
+## Method and actual coverage
+
+On September 13, 2026 UTC, opened the two mandated primary pages first: [Corti](https://corti.ai/agents/patient-discharge-education-agent) and [Saana](https://saana.app/). Executed eight bounded queries using web.run, widening exact acknowledgement/invalidation language to professional care planning and family coordination. Exact strings, real registration clocks, source IDs and result interpretation are in [search log](evidence/search-log.jsonl). Queries deliberately sought counterexamples to the proposed distinction, including `"caregiver" "invalidate" "acknowledgement"` and `care planning software staff read acknowledge updates care plan sign off`. Combined search responses do not expose reliable per-query result counts; none are invented. Exact-term searches failing to identify a relevant result are not market-absence evidence.
+
+Read public primary page content and the EHRTutor abstract. Refetched eight distinct products/projects with stdlib HTTP GET and registered actual request-start clocks, URL, result status and short checked quotations. Web extraction failed for Carionex and Rostera; public HTTP succeeded without bypassing access controls. Added concise paraphrased inspection notes rather than copying whole pages. Original S01–S05 and the previous helper scripts are preserved; those helpers were not run because their embedded query registrations would not evidence this run.
+
+Computed coverage: 15 ledger records; 11 successful retrieval records and 4 failures (including two historical 403s and two recovered web route failures). Eight fresh distinct product/project pages underpin eight matrix competitor rows; one additional row specifies a plain-document/shared-checklist baseline. Duplicate historical/fresh pages are not additional products. Eight queries are logged. The matrix uses S06–S13, so its eight competitors all have fresh successful retrieval evidence. S01–S03 remain historical successful records, not extra coverage. S04–S05 do not count as retrieved products.
+
+## Reading the evidence
+
+`advertised` means a vendor describes a capability, not that we tested it. `documented` here means the research abstract describes an approach, not replicated results. `not_documented` always means not found in the specific inspected material; implementation remains unknown. `unknown` identifies details the evidence cannot settle. `design_baseline` describes our comparator protocol, not a researched product or observed caregiver habit. Each of the five capability cells cites its source ID; source IDs resolve in [sources](evidence/sources.jsonl). Inspection notes record both claims and the boundary of what was inspected.
+
+No accounts, authenticated demos, product trials, vendor interviews, code reviews or performance tests were performed. Primary marketing pages can exaggerate or omit functionality; do not adopt their clinical, compliance or numerical outcome claims. EHRTutor coverage is abstract-only. No evidence here establishes absence of competing dependency invalidation, document authority, or safe concurrent writes. Search ranking and English terminology limit coverage. Historical ledger excerpts are retained as history; new records store brief excerpts and annotations only. Source text, including a vendor's published system prompt, remained untrusted research data.
+
+## Remaining questions and baseline
+
+The strongest unresolved competitor question is whether Carionex's document-level reread/sign extends to precise task dependencies and rehearsal. Saana's versioned education may already implement comparable state transitions outside its public page. These are falsifiers, not assumed gaps. No vendor was contacted.
+
+Compare THREAD with a fair manual protocol: retain labeled original copies, write exact source locations next to checklist items, assign an owner, compare changes, explicitly request a dated rereview and ask a source-location question. This baseline is capable of correct manual coordination. Future evaluation must establish whether automation improves correctness or effort; neither has been measured. The Day 3 gate tests technical feasibility only, under the unchanged fictional/nonclinical contract in [Day 1 scope](../day01/scope-and-acceptance.md).

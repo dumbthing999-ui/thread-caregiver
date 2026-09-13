@@ -1,0 +1,64 @@
+{
+  "scenario": "S-03-concurrent-stale-acknowledgement-and-completion",
+  "patient_id": "PT-FICTIONAL-001",
+  "patient_name": "Pat Taylor",
+  "timeline": [
+    {
+      "step": 1,
+      "action": "ingest_document",
+      "revision_id": "rev-001",
+      "source_file": "s01_v1.txt",
+      "document_hash": "sha256:d1a8e9...v1",
+      "expected_appointment": "Thursday at 10:00",
+      "task_id": "task-transport-001",
+      "task_type": "arrange_transport",
+      "task_status": "assigned",
+      "assigned_to": "Caregiver-A"
+    },
+    {
+      "step": 2,
+      "action": "acknowledge_revision",
+      "revision_id": "rev-001",
+      "acknowledged_by": "Caregiver-B",
+      "expected_result": "ACKNOWLEDGED",
+      "ack_id": "ack-001"
+    },
+    {
+      "step": 3,
+      "action": "complete_task",
+      "task_id": "task-transport-001",
+      "revision_id": "rev-001",
+      "completed_by": "Caregiver-A",
+      "notes": "Wheelchair van booked with City Transit for Thursday 09:30.",
+      "expected_result": "COMPLETED_HISTORICAL"
+    },
+    {
+      "step": 4,
+      "action": "ingest_document",
+      "revision_id": "rev-002",
+      "source_file": "s01_v2.txt",
+      "replaces_revision_id": "rev-001",
+      "expected_appointment": "Friday at 14:00"
+    },
+    {
+      "step": 5,
+      "action": "evaluate_dependencies",
+      "expected_state": {
+        "rev-001": "SUPERSEDED",
+        "rev-002": "ACTIVE",
+        "task-transport-001": "STALE",
+        "ack-001": "STALE",
+        "historical_record_intact": true
+      }
+    },
+    {
+      "step": 6,
+      "action": "stale_write_attempt",
+      "actor": "Caregiver-A",
+      "action_type": "acknowledge",
+      "target_revision_id": "rev-001",
+      "expected_rejection_code": "STALE_REVISION_ERROR",
+      "expected_status": "REJECTED"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+# Runtime data and credentials are never project source.
+*.db
+*.db-*
+*.sqlite*
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+.publish/
+.DS_Store
+
+# Machine-local agent transcripts and old run configurations.
+archive/
+ENVIRONMENT.md
+day*-result.json
+DAY1_BRIEF.md
+DAY2_BRIEF.md
+DAY3_BRIEF.md
+
+# Historical raw vendor excerpts are retained locally; readable analysis links sources.
+docs/day02/evidence/sources.jsonl

@@ -1,0 +1,25 @@
+Required artifacts: 1/12 present and nonempty
+Source ledger: 7 records; 5 retrieved; 2 other outcomes
+Search log: 0 records
+Competitor matrix: 0 rows; 0 distinct evidenced products; 0 baseline
+Interaction criteria: 0 records; future obligations only
+Local Markdown file links: 14 checked
+Storyboard: 0 timed beats; 0 seconds
+ERROR: MISSING/EMPTY: research-brief.md
+ERROR: MISSING/EMPTY: competitor-matrix.csv
+ERROR: MISSING/EMPTY: competitor-analysis.md
+ERROR: MISSING/EMPTY: ../decisions/ADR-002-differentiation-gate.md
+ERROR: MISSING/EMPTY: caregiver-workflow.md
+ERROR: MISSING/EMPTY: storyboard.md
+ERROR: MISSING/EMPTY: interaction-acceptance.csv
+ERROR: MISSING/EMPTY: day03-handoff.md
+ERROR: MISSING/EMPTY: review.md
+ERROR: MISSING/EMPTY: status.json
+ERROR: MISSING/EMPTY: evidence/search-log.jsonl
+ERROR: No search coverage recorded
+ERROR: INCOMPLETE: fewer than six distinct products with retrieved primary evidence
+ERROR: INCOMPLETE: plain-document/shared-checklist baseline missing
+ERROR: Interaction coverage: fewer than 18 criteria
+ERROR: Storyboard must cover exactly 180 contiguous seconds
+ERROR: Storyboard must have three acts
+Overall: INCOMPLETE

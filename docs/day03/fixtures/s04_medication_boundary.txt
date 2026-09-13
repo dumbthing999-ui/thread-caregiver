@@ -1,0 +1,17 @@
+MEDICATION DISCHARGE INSTRUCTIONS
+Patient: Alex Chen (Fictional Persona - S-04)
+Discharge Date: 2026-09-18
+Prescribing Physician: Dr. Sarah Lin (Fictional)
+
+Active Medication Quotation:
+"Metoprolol Tartrate 25mg oral tablet twice daily with meals."
+
+Clinical Warnings & Boundary Rules:
+1. Stop taking medication if pulse drops below 50 beats per minute and notify the clinic immediately.
+2. Do NOT crush, split, or chew extended-release formulations.
+3. Never adjust dosage, double dose, or alter administration timing independently.
+4. If a dose is missed, take as soon as remembered unless close to the next scheduled dose.
+
+NOTICE:
+This medication list represents read-only medical source documentation.
+THREAD and its caregiver interfaces do NOT calculate drug doses, do NOT verify pharmacologic interactions, and do NOT manage medication administration workflows.

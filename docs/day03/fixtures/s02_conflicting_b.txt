@@ -1,0 +1,12 @@
+CLINIC CONSULTATION NOTE B
+Patient: Morgan Reed (Fictional Persona - S-02)
+Date: 2026-09-17 11:15
+Source Facility: Eastside Specialty Clinic
+Author: Dr. Marcus Hayes
+
+Follow-up appointment: Thursday at 15:30.
+Clinic Location: East Pavilion, 3rd Floor.
+Office Contact: 555-0811.
+
+Caregiver Instructions:
+Arrange transport for Thursday afternoon follow-up.

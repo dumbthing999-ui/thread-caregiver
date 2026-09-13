@@ -1,0 +1,209 @@
+test_allowed_task_label_cannot_hide_treatment_action (test_contract_gaps.ContractGaps.test_allowed_task_label_cannot_hide_treatment_action) ... [31mFAIL[0m
+test_clinical_category_cannot_spawn_transport (test_contract_gaps.ContractGaps.test_clinical_category_cannot_spawn_transport) ... [31mFAIL[0m
+test_duplicate_revision_cannot_overwrite_source_identity (test_contract_gaps.ContractGaps.test_duplicate_revision_cannot_overwrite_source_identity) ... [31mFAIL[0m
+test_empty_instruction_cannot_publish_supported (test_contract_gaps.ContractGaps.test_empty_instruction_cannot_publish_supported) ... [31mFAIL[0m
+test_history_payload_cannot_be_mutated_by_reader (test_contract_gaps.ContractGaps.test_history_payload_cannot_be_mutated_by_reader) ... [31mFAIL[0m
+test_idempotency_key_cannot_mask_different_operation (test_contract_gaps.ContractGaps.test_idempotency_key_cannot_mask_different_operation) ... [31mFAIL[0m
+test_idempotency_key_cannot_mask_different_payload (test_contract_gaps.ContractGaps.test_idempotency_key_cannot_mask_different_payload) ... [31mFAIL[0m
+test_plain_ascii_pdf_is_rejected_by_text_only_importer (test_contract_gaps.ContractGaps.test_plain_ascii_pdf_is_rejected_by_text_only_importer) ... [31mFAIL[0m
+test_replacement_cannot_point_to_itself (test_contract_gaps.ContractGaps.test_replacement_cannot_point_to_itself) ... [31mFAIL[0m
+test_replacement_requires_existing_old_endpoint (test_contract_gaps.ContractGaps.test_replacement_requires_existing_old_endpoint) ... [31mFAIL[0m
+test_service_cannot_create_prohibited_clinical_task (test_contract_gaps.ContractGaps.test_service_cannot_create_prohibited_clinical_task) ... [31mFAIL[0m
+test_value_must_be_supported_by_its_quote (test_contract_gaps.ContractGaps.test_value_must_be_supported_by_its_quote) ... [31mFAIL[0m
+test_exact_source_anchor_resolves (test_contract_gaps.PositiveControls.test_exact_source_anchor_resolves) ... [32mok[0m
+test_identical_retry_records_one_event (test_contract_gaps.PositiveControls.test_identical_retry_records_one_event) ... [32mok[0m
+test_missing_quote_blocks_publication (test_contract_gaps.PositiveControls.test_missing_quote_blocks_publication) ... [32mok[0m
+test_new_stale_acknowledgement_is_rejected (test_contract_gaps.PositiveControls.test_new_stale_acknowledgement_is_rejected) ... [32mok[0m
+test_supported_nonclinical_candidate_publishes (test_contract_gaps.PositiveControls.test_supported_nonclinical_candidate_publishes) ... [32mok[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_allowed_task_label_cannot_hide_treatment_action (test_contract_gaps.ContractGaps.test_allowed_task_label_cannot_hide_treatment_action)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m69[0m, in [35mtest_allowed_task_label_cannot_hide_treatment_action[0m
+    [31mself.assertEqual[0m[1;31m(result.accepted_tasks, [],[0m
+    [31m~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                     [1;31m'FR-04: an allowed enum does not make its free text nonclinical')[0m
+                     [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mLists differ: [CoordinationTask(task_id='transport-1', t[224 chars]one)] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+CoordinationTask(task_id='transport-1', task_type=<TaskType.ARRANGE_TRANSPORT: 'ARRANGE_TRANSPORT'>, description='Change the treatment now.', status=<TaskStatus.UNASSIGNED: 'UNASSIGNED'>, linked_instruction_id='instruction-1', linked_revision_id='r1', assigned_to=None)
+
++ []
+- [CoordinationTask(task_id='transport-1',
+-                   task_type=<TaskType.ARRANGE_TRANSPORT: 'ARRANGE_TRANSPORT'>,
+-                   description='Change the treatment now.',
+-                   status=<TaskStatus.UNASSIGNED: 'UNASSIGNED'>,
+-                   linked_instruction_id='instruction-1',
+-                   linked_revision_id='r1',
+-                   assigned_to=None)] : FR-04: an allowed enum does not make its free text nonclinical[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_clinical_category_cannot_spawn_transport (test_contract_gaps.ContractGaps.test_clinical_category_cannot_spawn_transport)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m64[0m, in [35mtest_clinical_category_cannot_spawn_transport[0m
+    [31mself.assertEqual[0m[1;31m(result.accepted_tasks, [],[0m
+    [31m~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                     [1;31m'FR-04: a clinical category is not an eligible nonclinical dependency')[0m
+                     [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mLists differ: [CoordinationTask(task_id='transport-1', t[244 chars]one)] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+CoordinationTask(task_id='transport-1', task_type=<TaskType.ARRANGE_TRANSPORT: 'ARRANGE_TRANSPORT'>, description='Arrange transport for the quoted appointment.', status=<TaskStatus.UNASSIGNED: 'UNASSIGNED'>, linked_instruction_id='instruction-1', linked_revision_id='r1', assigned_to=None)
+
++ []
+- [CoordinationTask(task_id='transport-1',
+-                   task_type=<TaskType.ARRANGE_TRANSPORT: 'ARRANGE_TRANSPORT'>,
+-                   description='Arrange transport for the quoted appointment.',
+-                   status=<TaskStatus.UNASSIGNED: 'UNASSIGNED'>,
+-                   linked_instruction_id='instruction-1',
+-                   linked_revision_id='r1',
+-                   assigned_to=None)] : FR-04: a clinical category is not an eligible nonclinical dependency[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_duplicate_revision_cannot_overwrite_source_identity (test_contract_gaps.ContractGaps.test_duplicate_revision_cannot_overwrite_source_identity)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m79[0m, in [35mtest_duplicate_revision_cannot_overwrite_source_identity[0m
+    [31mself.assertEqual[0m[1;31m(dataclasses.asdict(service.revisions['r1']), original,[0m
+    [31m~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                     [1;31m'INV-01: revision ID reuse must not overwrite original source identity')[0m
+                     [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35m{'rev[24 chars]': 'different-document', 'version_number': 99,[137 chars]:00'} != {'rev[24 chars]': 'doc-1', 'version_number': 1, 'state': <Evi[123 chars]:00'}
+- {'doc_id': 'different-document',
++ {'doc_id': 'doc-1',
+   'replaces_revision_id': None,
+   'revision_id': 'r1',
+   'state': <EvidenceState.SOURCE_SUPPORTED: 'SOURCE_SUPPORTED'>,
+-  'timestamp': '2026-09-13T13:50:38.012675+00:00',
+?                                        ^^
+
++  'timestamp': '2026-09-13T13:50:38.012613+00:00',
+?                                        ^^
+
+-  'version_number': 99}
+?                    ^^
+
++  'version_number': 1}
+?                    ^
+ : INV-01: revision ID reuse must not overwrite original source identity[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_empty_instruction_cannot_publish_supported (test_contract_gaps.ContractGaps.test_empty_instruction_cannot_publish_supported)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m59[0m, in [35mtest_empty_instruction_cannot_publish_supported[0m
+    [31mself.assertEqual[0m[1;31m(result.accepted_instructions, [],[0m
+    [31m~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                     [1;31m'FR-02/FR-03: an empty instruction has no supporting source fields')[0m
+                     [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mLists differ: [Instruction(instruction_id='empty', revis[158 chars]D'>)] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+Instruction(instruction_id='empty', revision_id='r1', category=<InstructionCategory.FOLLOW_UP_APPOINTMENT: 'FOLLOW_UP_APPOINTMENT'>, fields=[], state=<EvidenceState.SOURCE_SUPPORTED: 'SOURCE_SUPPORTED'>)
+
++ []
+- [Instruction(instruction_id='empty',
+-              revision_id='r1',
+-              category=<InstructionCategory.FOLLOW_UP_APPOINTMENT: 'FOLLOW_UP_APPOINTMENT'>,
+-              fields=[],
+-              state=<EvidenceState.SOURCE_SUPPORTED: 'SOURCE_SUPPORTED'>)] : FR-02/FR-03: an empty instruction has no supporting source fields[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_history_payload_cannot_be_mutated_by_reader (test_contract_gaps.ContractGaps.test_history_payload_cannot_be_mutated_by_reader)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m112[0m, in [35mtest_history_payload_cannot_be_mutated_by_reader[0m
+    [31mself.assertEqual[0m[1;31m(service.events[0].payload['status'], 'VALID',[0m
+    [31m~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                     [1;31m'INV-01/INV-05: frozen outer event must protect nested historical payload')[0m
+                     [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35m'REWRITTEN' != 'VALID'
+- REWRITTEN
++ VALID
+ : INV-01/INV-05: frozen outer event must protect nested historical payload[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_idempotency_key_cannot_mask_different_operation (test_contract_gaps.ContractGaps.test_idempotency_key_cannot_mask_different_operation)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m95[0m, in [35mtest_idempotency_key_cannot_mask_different_operation[0m
+    with [31mself.assertRaises[0m[1;31m(StateError, msg='FR-07: same key with different operation must conflict')[0m:
+         [31m~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mStateError not raised : FR-07: same key with different operation must conflict[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_idempotency_key_cannot_mask_different_payload (test_contract_gaps.ContractGaps.test_idempotency_key_cannot_mask_different_payload)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m101[0m, in [35mtest_idempotency_key_cannot_mask_different_payload[0m
+    with [31mself.assertRaises[0m[1;31m(StateError, msg='FR-07: conflicting retry payload must be rejected')[0m:
+         [31m~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mStateError not raised : FR-07: conflicting retry payload must be rejected[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_plain_ascii_pdf_is_rejected_by_text_only_importer (test_contract_gaps.ContractGaps.test_plain_ascii_pdf_is_rejected_by_text_only_importer)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m121[0m, in [35mtest_plain_ascii_pdf_is_rejected_by_text_only_importer[0m
+    with [31mself.assertRaises[0m[1;31m(UnsupportedDocumentFormatError,[0m
+         [31m~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                           [1;31mmsg='FR-01: decoding PDF bytes is not supported extraction')[0m:
+                           [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mUnsupportedDocumentFormatError not raised : FR-01: decoding PDF bytes is not supported extraction[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_replacement_cannot_point_to_itself (test_contract_gaps.ContractGaps.test_replacement_cannot_point_to_itself)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m89[0m, in [35mtest_replacement_cannot_point_to_itself[0m
+    with [31mself.assertRaises[0m[1;31m(StateError, msg='INV-04: self-replacement is not a valid revision link')[0m:
+         [31m~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mStateError not raised : INV-04: self-replacement is not a valid revision link[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_replacement_requires_existing_old_endpoint (test_contract_gaps.ContractGaps.test_replacement_requires_existing_old_endpoint)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m84[0m, in [35mtest_replacement_requires_existing_old_endpoint[0m
+    with [31mself.assertRaises[0m[1;31m(StateError, msg='FR-05: reject a dangling claimed replacement')[0m:
+         [31m~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mStateError not raised : FR-05: reject a dangling claimed replacement[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_service_cannot_create_prohibited_clinical_task (test_contract_gaps.ContractGaps.test_service_cannot_create_prohibited_clinical_task)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m127[0m, in [35mtest_service_cannot_create_prohibited_clinical_task[0m
+    with [31mself.assertRaises[0m[1;31m(StateError, msg='FR-04: authoritative path must enforce task boundary')[0m:
+         [31m~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mStateError not raised : FR-04: authoritative path must enforce task boundary[0m
+
+======================================================================
+[31mFAIL[0m[1;31m: test_value_must_be_supported_by_its_quote (test_contract_gaps.ContractGaps.test_value_must_be_supported_by_its_quote)[0m
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File [35m"/home/kali/univabio-thread/tests/day04/test_contract_gaps.py"[0m, line [35m54[0m, in [35mtest_value_must_be_supported_by_its_quote[0m
+    [31mself.assertEqual[0m[1;31m(result.accepted_instructions, [],[0m
+    [31m~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+                     [1;31m'FR-02: a correct anchor cannot support contradictory displayed wording')[0m
+                     [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mAssertionError[0m: [35mLists differ: [Instruction(instruction_id='instruction-1[468 chars]D'>)] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+Instruction(instruction_id='instruction-1', revision_id='r1', category=<InstructionCategory.FOLLOW_UP_APPOINTMENT: 'FOLLOW_UP_APPOINTMENT'>, fields=[InstructionField(name='appointment_wording', value='Follow-up appointment: Friday at 14:00', span=SourceSpan(span_id='span-0-0', doc_id='synthetic-doc', start_char=0, end_char=41, line_start=1, col_start=1, line_end=1, col_end=42, exact_quote='Follow-up appointment: Thursday at 10:00.', page_index=0))], state=<EvidenceState.SOURCE_SUPPORTED: 'SOURCE_SUPPORTED'>)
+
+Diff is 1429 characters long. Set self.maxDiff to None to see it. : FR-02: a correct anchor cannot support contradictory displayed wording[0m
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.014s
+
+[1;31mFAILED[0m ([1;31mfailures=12[0m)
+
+Red-baseline integrity: MATCH (not product PASS)

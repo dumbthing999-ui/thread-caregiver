@@ -1,0 +1,14 @@
+DISCHARGE SUMMARY (REVISION 2 - REPLACEMENT FOR REVISION 1)
+Patient: Pat Taylor (Fictional Persona - S-01)
+Revision Date: 2026-09-16
+
+Follow-up appointment: Friday at 14:00.
+Clinic Location: Downtown Specialty Clinic, Room 402.
+Office Contact: 555-0199 (Mon-Fri 8am-4pm).
+
+Instructions for Caregiver:
+1. Arrange non-emergency wheelchair transport for the updated follow-up appointment.
+2. Call the office if you need appointment rescheduling.
+
+Medication Summary:
+Lisinopril 10mg oral daily in morning. (Read-only quotation. Do not alter dose.)

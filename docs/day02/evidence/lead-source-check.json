@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-09-13T08:25:53.535219+00:00",
+  "url": "https://www.carionex.co.uk/solutions/care-planning-software",
+  "check": "Lead independent check of central competitive counterevidence",
+  "web_renderer_status": "400 Timeout fetching",
+  "http_status": 200,
+  "checks": {
+    "version_change_prompts_reread_and_sign": true,
+    "immutable_snapshot_wording": true,
+    "changed_since_last_sign_wording": true
+  },
+  "limitation": "Textual marketing inspection only; no product behavior tested. Last check is lexical presence, not proof of exact UI behavior."
+}

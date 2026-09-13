@@ -1,0 +1,24 @@
+{
+  "scope": "Assertions against unchanged Day 3 development spikes; red-baseline integrity is not product acceptance",
+  "expected_red_ids": [
+    "test_contract_gaps.ContractGaps.test_value_must_be_supported_by_its_quote",
+    "test_contract_gaps.ContractGaps.test_empty_instruction_cannot_publish_supported",
+    "test_contract_gaps.ContractGaps.test_clinical_category_cannot_spawn_transport",
+    "test_contract_gaps.ContractGaps.test_allowed_task_label_cannot_hide_treatment_action",
+    "test_contract_gaps.ContractGaps.test_duplicate_revision_cannot_overwrite_source_identity",
+    "test_contract_gaps.ContractGaps.test_replacement_requires_existing_old_endpoint",
+    "test_contract_gaps.ContractGaps.test_replacement_cannot_point_to_itself",
+    "test_contract_gaps.ContractGaps.test_idempotency_key_cannot_mask_different_operation",
+    "test_contract_gaps.ContractGaps.test_idempotency_key_cannot_mask_different_payload",
+    "test_contract_gaps.ContractGaps.test_history_payload_cannot_be_mutated_by_reader",
+    "test_contract_gaps.ContractGaps.test_plain_ascii_pdf_is_rejected_by_text_only_importer",
+    "test_contract_gaps.ContractGaps.test_service_cannot_create_prohibited_clinical_task"
+  ],
+  "positive_control_ids": [
+    "test_contract_gaps.PositiveControls.test_exact_source_anchor_resolves",
+    "test_contract_gaps.PositiveControls.test_supported_nonclinical_candidate_publishes",
+    "test_contract_gaps.PositiveControls.test_missing_quote_blocks_publication",
+    "test_contract_gaps.PositiveControls.test_identical_retry_records_one_event",
+    "test_contract_gaps.PositiveControls.test_new_stale_acknowledgement_is_rejected"
+  ]
+}
