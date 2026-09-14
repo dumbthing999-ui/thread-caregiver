@@ -4,7 +4,13 @@
 
 A working local prototype for a fictional caregiver handoff. THREAD connects an exact source quotation to a transport task and its acknowledgement. When a claimed replacement changes the appointment, the old review becomes stale and stays visible in history.
 
-**For judges:** [Run it](#run-it) · [Try the demonstration](#try-the-demonstration) · [Five judging criteria](#five-judging-criteria) · [Evidence and limitations](#evidence-and-limitations)
+**For judges:** [Demo Video](#demo-video) · [Run it](#run-it) · [Try the demonstration](#try-the-demonstration) · [Five judging criteria](#five-judging-criteria) · [Evidence and limitations](#evidence-and-limitations)
+
+## Demo Video
+
+🎬 **[Watch / Download 1080p Walkthrough Video](https://github.com/dumbthing999-ui/thread-caregiver/releases/download/v1.0.0/thread_caregiver_demo.mp4)** · **[v1.0.0 Release Assets](https://github.com/dumbthing999-ui/thread-caregiver/releases/tag/v1.0.0)**
+
+[![THREAD Caregiver Demo](https://github.com/dumbthing999-ui/thread-caregiver/releases/download/v1.0.0/thumbnail_source_span.jpg)](https://github.com/dumbthing999-ui/thread-caregiver/releases/download/v1.0.0/thread_caregiver_demo.mp4)
 
 ## Run it
 
