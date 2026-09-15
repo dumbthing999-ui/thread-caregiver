@@ -27,6 +27,8 @@ from socketserver import ThreadingMixIn
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
+from app.ai import AssistantError, find_sources
+
 from app.domain import (
     Category,
     DomainError,
@@ -61,6 +63,10 @@ def to_serializable(obj: Any) -> Any:
 class ThreadRequestHandler(BaseHTTPRequestHandler):
     server_version = "THREAD-HTTP/0.1.0"
 
+    @property
+    def service(self):
+        return SERVICE
+
     def do_OPTIONS(self):
         self.send_response(HTTPStatus.NO_CONTENT)
         self._send_cors_headers()
@@ -89,6 +95,17 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_not_found(self):
+        """Return a useful HTML destination for people, while API routes stay JSON."""
+        body = (REPO_ROOT / "app" / "not-found.html").read_text(encoding="utf-8").encode("utf-8")
+        self.send_response(HTTPStatus.NOT_FOUND)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self._send_cors_headers()
         self.end_headers()
         self.wfile.write(body)
@@ -131,16 +148,16 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 parts = path.split("/")
                 if len(parts) == 5:
                     case_id = parts[4]
-                    snapshot = SERVICE.get_case_snapshot(case_id)
+                    snapshot = self.service.get_case_snapshot(case_id)
                     etag = snapshot["etag"]
                     return self._send_json(HTTPStatus.OK, snapshot, {"ETag": etag})
                 elif len(parts) == 6 and parts[5] == "history":
                     case_id = parts[4]
-                    history = SERVICE.get_history(case_id)
+                    history = self.service.get_history(case_id)
                     return self._send_json(HTTPStatus.OK, {"case_id": case_id, "events": history})
                 elif len(parts) == 6 and parts[5] == "export":
                     case_id = parts[4]
-                    exported = SERVICE.export_case(case_id)
+                    exported = self.service.export_case(case_id)
                     return self._send_json(HTTPStatus.OK, exported)
                 elif len(parts) == 6 and parts[5] == "diff":
                     case_id = parts[4]
@@ -149,10 +166,10 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                     doc2_id = qs.get("doc2", [None])[0]
                     if not doc1_id or not doc2_id:
                         raise MalformedRequestError("Diff requires 'doc1' and 'doc2' query parameters.")
-                    if doc1_id not in SERVICE.documents or doc2_id not in SERVICE.documents:
+                    if doc1_id not in self.service.documents or doc2_id not in self.service.documents:
                         raise NotFoundError("One or both documents not found in service.")
-                    t1 = SERVICE.documents[doc1_id].text
-                    t2 = SERVICE.documents[doc2_id].text
+                    t1 = self.service.documents[doc1_id].text
+                    t2 = self.service.documents[doc2_id].text
                     raw_diff = list(difflib.ndiff(t1.splitlines(), t2.splitlines()))
                     lines = []
                     for line in raw_diff:
@@ -174,8 +191,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                     })
                 elif len(parts) == 6 and parts[5] == "rehearsals":
                     case_id = parts[4]
-                    rehearsals = [dataclasses.asdict(r) for r in SERVICE.rehearsals.values() if r.case_id == case_id]
-                    projections = [dataclasses.asdict(p) for p in SERVICE.rehearsal_projections.values() if p.case_id == case_id]
+                    rehearsals = [dataclasses.asdict(r) for r in self.service.rehearsals.values() if r.case_id == case_id]
+                    projections = [dataclasses.asdict(p) for p in self.service.rehearsal_projections.values() if p.case_id == case_id]
                     return self._send_json(HTTPStatus.OK, {
                         "case_id": case_id,
                         "rehearsals": rehearsals,
@@ -184,13 +201,21 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
 
             # API: GET /api/v1/fixtures/{name}
             if path.startswith("/api/v1/fixtures/"):
-                name = path.replace("/api/v1/fixtures/", "")
+                name = path.removeprefix("/api/v1/fixtures/")
+                # Serve only bundled source notes, never user-selected filesystem paths.
+                allowed = {"s01_v1.txt", "s01_v2.txt", "s02_conflicting_a.txt",
+                           "s02_conflicting_b.txt", "s04_medication_boundary.txt",
+                           "s05_injection_control.txt"}
+                if name not in allowed:
+                    return self._send_json(HTTPStatus.NOT_FOUND, {"error": "Fixture not found"})
                 fix_file = FIXTURES_DIR / name
-                if fix_file.exists() and fix_file.is_file():
+                if fix_file.resolve().parent == FIXTURES_DIR.resolve() and fix_file.is_file():
                     content = fix_file.read_text(encoding="utf-8")
                     return self._send_json(HTTPStatus.OK, {"name": name, "content": content})
                 return self._send_json(HTTPStatus.NOT_FOUND, {"error": f"Fixture '{name}' not found"})
 
+            if not path.startswith("/api/"):
+                return self._serve_not_found()
             return self._send_json(HTTPStatus.NOT_FOUND, {"error": "Route not found", "path": path})
 
         except DomainError as de:
@@ -203,12 +228,36 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/")
 
         try:
+            if path.endswith("/ai/source-finder") and path.startswith("/api/v1/cases/"):
+                # Require a same-origin JSON request before any paid external request.
+                origin = self.headers.get("Origin")
+                if (origin and origin not in ("http://" + self.headers.get("Host", ""), "https://" + self.headers.get("Host", ""))) or self.headers.get("Sec-Fetch-Site") == "cross-site":
+                    return self._send_json(403, {"error": "Use the assistant from the local THREAD page."})
+                if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+                    return self._send_json(415, {"error": "JSON is required."})
+                if int(self.headers.get("Content-Length", 0)) > 2048:
+                    return self._send_json(413, {"error": "Request too large."})
+                body = self._parse_body()
+                if not isinstance(body, dict) or body.get("fictional_only") is not True:
+                    return self._send_json(400, {"error": "Confirm fictional-only content before sending to NVIDIA."})
+                case_id = path.split("/")[4]
+                snapshot = self.service.get_case_snapshot(case_id)
+                if body.get("etag") != snapshot["etag"]:
+                    return self._send_json(409, {"error": "Source state changed. Refresh before requesting AI."})
+                try:
+                    result = find_sources(snapshot["documents"])
+                except AssistantError as exc:
+                    return self._send_json(503, {"error": str(exc)})
+                if self.service.get_case_snapshot(case_id)["etag"] != snapshot["etag"]:
+                    return self._send_json(409, {"error": "Source state changed during AI review. Refresh and try again."})
+                return self._send_json(200, {**result, "etag": snapshot["etag"], "case_id": case_id})
+
             # 1. POST /api/v1/sessions
             if path == "/api/v1/sessions":
                 body = self._parse_body()
                 fictional_only = body.get("fictional_only", True)
                 case_id = body.get("case_id")
-                case = SERVICE.create_case(case_id=case_id, fictional_only=fictional_only)
+                case = self.service.create_case(case_id=case_id, fictional_only=fictional_only)
                 return self._send_json(HTTPStatus.CREATED, {
                     "case_id": case.case_id,
                     "state_version": case.state_version,
@@ -223,8 +272,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 filename = body.get("filename", "unnamed.txt")
                 text = body.get("text", "")
                 actor = body.get("actor_id", "Morgan")
-                doc = SERVICE.import_document(case_id, filename, text, actor)
-                c = SERVICE.get_case(case_id)
+                doc = self.service.import_document(case_id, filename, text, actor)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "document": doc,
                     "state_version": c.state_version,
@@ -242,8 +291,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 field_name = body.get("field_name", "appointment_wording")
                 exact_quote = body.get("exact_quote", "")
                 actor = body.get("actor_id", "Morgan")
-                instr, span = SERVICE.review_source(case_id, doc_id, expected_sver, category, field_name, exact_quote, actor)
-                c = SERVICE.get_case(case_id)
+                instr, span = self.service.review_source(case_id, doc_id, expected_sver, category, field_name, exact_quote, actor)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "instruction": instr,
                     "span": span,
@@ -260,8 +309,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 instr_id = body.get("instruction_id")
                 desc = body.get("description", "Arrange non-emergency transport.")
                 actor = body.get("actor_id", "Morgan")
-                task, proj = SERVICE.create_task(case_id, task_type, instr_id, desc, actor)
-                c = SERVICE.get_case(case_id)
+                task, proj = self.service.create_task(case_id, task_type, instr_id, desc, actor)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "task": task,
                     "projection": proj,
@@ -277,8 +326,31 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 body = self._parse_body()
                 expected_trev = body.get("expected_task_revision")
                 actor = body.get("actor_id", "Morgan")
-                proj = SERVICE.confirm_owner(case_id, task_id, expected_trev, actor)
-                c = SERVICE.get_case(case_id)
+                proj = self.service.confirm_owner(case_id, task_id, expected_trev, actor)
+                c = self.service.get_case(case_id)
+                return self._send_json(HTTPStatus.OK, {
+                    "projection": proj,
+                    "state_version": c.state_version,
+                    "etag": f'"case-state-{c.state_version}"',
+                })
+
+            # 5b. POST /api/v1/cases/{case_id}/tasks/{task_id}/complete
+            if "/tasks/" in path and path.endswith("/complete"):
+                parts = path.split("/")
+                case_id = parts[4]
+                task_id = parts[6]
+                if_match = self.headers.get("If-Match")
+                idempotency_key = self.headers.get("Idempotency-Key")
+                if not idempotency_key:
+                    raise MalformedRequestError("Missing Idempotency-Key header.")
+                self.service.validate_preconditions(case_id, if_match, require_etag=True)
+                body = self._parse_body()
+                expected_trev = body.get("expected_task_revision")
+                actor = body.get("actor_id", "Morgan")
+                completion_note = body.get("completion_note", "")
+                fingerprint = self.service._compute_fingerprint("POST", path, body)
+                proj = self.service.complete_task(case_id, task_id, expected_trev, actor, completion_note, idempotency_key, fingerprint)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.OK, {
                     "projection": proj,
                     "state_version": c.state_version,
@@ -294,16 +366,16 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                     raise MalformedRequestError("Missing Idempotency-Key header.")
 
                 # Validate If-Match case ETag
-                SERVICE.validate_preconditions(case_id, if_match, require_etag=True)
+                self.service.validate_preconditions(case_id, if_match, require_etag=True)
 
                 body = self._parse_body()
                 task_id = body.get("task_id")
                 expected_trev = body.get("expected_task_revision")
                 actor = body.get("actor_id", "Morgan")
 
-                fingerprint = SERVICE._compute_fingerprint("POST", path, body)
-                ack, proj = SERVICE.acknowledge_task(case_id, task_id, expected_trev, actor, idempotency_key, fingerprint)
-                c = SERVICE.get_case(case_id)
+                fingerprint = self.service._compute_fingerprint("POST", path, body)
+                ack, proj = self.service.acknowledge_task(case_id, task_id, expected_trev, actor, idempotency_key, fingerprint)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "acknowledgement": ack,
                     "projection": proj,
@@ -315,7 +387,7 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
             if path.endswith("/replacement-links") and "/cases/" in path:
                 case_id = path.split("/")[4]
                 if_match = self.headers.get("If-Match")
-                SERVICE.validate_preconditions(case_id, if_match, require_etag=True)
+                self.service.validate_preconditions(case_id, if_match, require_etag=True)
 
                 body = self._parse_body()
                 prior_doc_id = body.get("prior_document_id")
@@ -324,8 +396,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 exp_new = body.get("expected_new_source_version")
                 actor = body.get("actor_id", "Morgan")
 
-                link = SERVICE.link_replacement(case_id, prior_doc_id, new_doc_id, exp_prior, exp_new, actor)
-                c = SERVICE.get_case(case_id)
+                link = self.service.link_replacement(case_id, prior_doc_id, new_doc_id, exp_prior, exp_new, actor)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "link": link,
                     "state_version": c.state_version,
@@ -341,8 +413,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 question = body.get("question", "")
                 choices = body.get("choices", [])
                 actor = body.get("actor_id", "Morgan")
-                item, proj = SERVICE.create_rehearsal_item(case_id, instr_id, exp_irev, question, choices, actor)
-                c = SERVICE.get_case(case_id)
+                item, proj = self.service.create_rehearsal_item(case_id, instr_id, exp_irev, question, choices, actor)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "rehearsal_item": item,
                     "projection": proj,
@@ -359,8 +431,8 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
                 exp_irev = body.get("expected_item_revision")
                 actor = body.get("actor_id", "Pat")
                 choice_id = body.get("choice_id")
-                attempt, proj = SERVICE.attempt_rehearsal(case_id, item_id, exp_irev, actor, choice_id)
-                c = SERVICE.get_case(case_id)
+                attempt, proj = self.service.attempt_rehearsal(case_id, item_id, exp_irev, actor, choice_id)
+                c = self.service.get_case(case_id)
                 return self._send_json(HTTPStatus.CREATED, {
                     "attempt": attempt,
                     "projection": proj,
@@ -371,7 +443,7 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
             # 10. POST /api/v1/cases/{case_id}/reset
             if path.endswith("/reset") and "/cases/" in path:
                 case_id = path.split("/")[4]
-                SERVICE.reset_case(case_id)
+                self.service.reset_case(case_id)
                 return self._send_json(HTTPStatus.OK, {
                     "case_id": case_id,
                     "message": f"Case '{case_id}' reset successfully.",
@@ -379,16 +451,16 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
 
             # 11. POST /api/v1/demo/init-working-path
             if path == "/api/v1/demo/init-working-path":
-                case = SERVICE.create_case("demo-case-01", fictional_only=True)
+                case = self.service.create_case("demo-case-01", fictional_only=True)
                 # Ingest v1 fixture
                 v1_path = FIXTURES_DIR / "s01_v1.txt"
                 v1_text = v1_path.read_text(encoding="utf-8")
-                doc1 = SERVICE.import_document(case.case_id, "s01_v1.txt", v1_text, "Morgan", "doc-v1", "v1")
+                doc1 = self.service.import_document(case.case_id, "s01_v1.txt", v1_text, "Morgan", "doc-v1", "v1")
 
                 # Ingest v2 fixture
                 v2_path = FIXTURES_DIR / "s01_v2.txt"
                 v2_text = v2_path.read_text(encoding="utf-8")
-                doc2 = SERVICE.import_document(case.case_id, "s01_v2.txt", v2_text, "Morgan", "doc-v2", "v2")
+                doc2 = self.service.import_document(case.case_id, "s01_v2.txt", v2_text, "Morgan", "doc-v2", "v2")
 
                 return self._send_json(HTTPStatus.CREATED, {
                     "case_id": case.case_id,
@@ -401,13 +473,13 @@ class ThreadRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/v1/demo/init-conflicting-path":
                 # The UI requests a fresh example so it cannot reset another visitor's case.
                 body = self._parse_body()
-                case = SERVICE.create_case(None if body.get("isolated") is True else "demo-conflict-01", fictional_only=True)
+                case = self.service.create_case(None if body.get("isolated") is True else "demo-conflict-01", fictional_only=True)
                 ca_path = FIXTURES_DIR / "s02_conflicting_a.txt"
                 cb_path = FIXTURES_DIR / "s02_conflicting_b.txt"
                 text_a = ca_path.read_text(encoding="utf-8")
                 text_b = cb_path.read_text(encoding="utf-8")
 
-                doc_a, doc_b, issue, task = SERVICE.setup_conflicting_case(case.case_id, text_a, text_b)
+                doc_a, doc_b, issue, task = self.service.setup_conflicting_case(case.case_id, text_a, text_b)
                 return self._send_json(HTTPStatus.CREATED, {
                     "case_id": case.case_id,
                     "doc_a": doc_a,

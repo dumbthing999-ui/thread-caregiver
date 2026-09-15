@@ -26,6 +26,7 @@ from app.domain import (
     Category,
     IdempotencyKeyReusedError,
     InvalidReplacementError,
+    MalformedRequestError,
     ProvenanceInvalidError,
     StaleRevisionError,
     TaskNotAllowedError,
@@ -80,11 +81,13 @@ class ContractCompliance(unittest.TestCase):
 
     def test_duplicate_revision_cannot_overwrite_source_identity(self):
         """FR-01/INV-01: Duplicate document ID cannot overwrite existing document."""
-        # Attempting to re-register doc with changed text
         doc_original = self.service.documents[self.doc.document_id]
         orig_sha = doc_original.sha256
-        # In ThreadService, import_document with same ID appends or preserves
-        # Confirm that the stored document content is not secretly changed
+        # Attempting to re-register doc with changed text must fail
+        with self.assertRaises(MalformedRequestError, msg="Duplicate doc ID with different content must be rejected"):
+            self.service.import_document(
+                self.cid, "changed.txt", "Different content.", "Morgan", self.doc.document_id, "r1"
+            )
         self.assertEqual(self.service.documents[self.doc.document_id].sha256, orig_sha)
 
     def test_replacement_requires_existing_old_endpoint(self):
@@ -97,6 +100,17 @@ class ContractCompliance(unittest.TestCase):
         """INV-04: Self-replacement is not a valid revision link."""
         with self.assertRaises(InvalidReplacementError, msg="INV-04: self-replacement must be rejected"):
             self.service.link_replacement(self.cid, self.doc.document_id, self.doc.document_id, "r1", "r1")
+
+    def test_replacement_cycle_is_rejected(self):
+        """INV-04: Circular replacement chains must be rejected."""
+        doc2 = self.service.import_document(self.cid, "doc2.txt", "Update text.", "Morgan", "doc-2", "r2")
+        doc3 = self.service.import_document(self.cid, "doc3.txt", "Third text.", "Morgan", "doc-3", "r3")
+        # Link doc1 -> doc2, doc2 -> doc3
+        self.service.link_replacement(self.cid, self.doc.document_id, doc2.document_id, "r1", "r2")
+        self.service.link_replacement(self.cid, doc2.document_id, doc3.document_id, "r2", "r3")
+        # Attempting to link doc3 -> doc1 creates a cycle and must be rejected
+        with self.assertRaises(InvalidReplacementError, msg="INV-04: circular replacement cycle must be rejected"):
+            self.service.link_replacement(self.cid, doc3.document_id, self.doc.document_id, "r3", "r1")
 
     def test_idempotency_key_cannot_mask_different_operation(self):
         """FR-07/INV-07: Same key with different operation must conflict."""

@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 30,
+      "includeFiles": "{app/**,docs/day03/fixtures/*.txt}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index?__thread_path=$1"
+    }
+  ]
+}

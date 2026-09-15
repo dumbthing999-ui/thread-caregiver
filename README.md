@@ -4,13 +4,7 @@
 
 A working local prototype for a fictional caregiver handoff. THREAD connects an exact source quotation to a transport task and its acknowledgement. When a claimed replacement changes the appointment, the old review becomes stale and stays visible in history.
 
-**For judges:** [Demo Video](#demo-video) · [Run it](#run-it) · [Try the demonstration](#try-the-demonstration) · [Five judging criteria](#five-judging-criteria) · [Evidence and limitations](#evidence-and-limitations)
-
-## Demo Video
-
-🎬 **[Watch / Download 1080p Walkthrough Video](https://github.com/dumbthing999-ui/thread-caregiver/releases/download/v1.0.0/thread_caregiver_demo.mp4)** · **[v1.0.0 Release Assets](https://github.com/dumbthing999-ui/thread-caregiver/releases/tag/v1.0.0)**
-
-[![THREAD Caregiver Demo](https://github.com/dumbthing999-ui/thread-caregiver/releases/download/v1.0.0/thumbnail_source_span.jpg)](https://github.com/dumbthing999-ui/thread-caregiver/releases/download/v1.0.0/thread_caregiver_demo.mp4)
+**For judges:** [Run it](#run-it) · [Try the demonstration](#try-the-demonstration) · [Five judging criteria](#five-judging-criteria) · [Evidence and limitations](#evidence-and-limitations)
 
 ## Run it
 
@@ -32,6 +26,26 @@ python3 run_app.py --port 8000 --db thread.db
 
 The default is in-memory storage. Database files are excluded from Git. Keep the server bound to localhost: actor identities in this prototype are simulated, not production authentication. No hosted deployment is claimed.
 
+## Optional NVIDIA source assistant
+
+The assistant finds appointment and transport passages across the current handoff's fictional notes. Each result shows the original quotation, document revision, line and character anchors, with an **Inspect original** link. It never creates tasks, acknowledges wording, selects a disputed appointment or generates medical advice. A source selection may be incomplete or irrelevant; read all original notes. All returned content is labelled read-only quotation, including any medication text the model incorrectly selects.
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-ai.txt
+read -rsp 'NVIDIA API key: ' NVIDIA_API_KEY
+export NVIDIA_API_KEY
+.venv/bin/python run_app.py --port 8000
+```
+
+Use a newly rotated key if one was shared in chat. Credentials stay in the server environment; `.env` is not loaded automatically. Open a handoff, confirm the notes are fictional, then select **Find source passages**. This sends the case's source text to NVIDIA; it is no longer a fully local operation. Nothing is sent automatically. Results are temporary, excluded from exports, and hidden after local revision changes. A fresh service snapshot is checked before and after inference. The prototype still lacks production identity and must remain localhost-only.
+
+Uses `from openai import OpenAI`, NVIDIA's hosted endpoint, and `nvidia/nemotron-3.5-lightning-30b-a3b`. Reasoning is disabled for this bounded JSON selection task; generated prose is discarded, and quotations are reconstructed from original lines. Missing credentials, malformed output and provider errors leave manual source review available. Requests have a 30-second SDK timeout, no automatic retries and at most two concurrent provider calls.
+
+Research: [NVIDIA's model documentation](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b) confirms the integration; [NN/g's research on explainable AI](https://www.nngroup.com/articles/explainable-ai/) informs the visible source links and explicit review. These references do not establish hackathon eligibility or a winning outcome.
+
+Verification: 40 Python tests and the real-service UI controller pass, including mocked provider responses, exact Unicode anchors, competing labelled appointment preservation, invalid indexes, error redaction, consent, cross-origin rejection, revision changes and escaped UI output. Live NVIDIA inference has not been verified with a configured credential. No claim of extraction accuracy or clinical safety is made.
+
 ## Try the demonstration
 
 1. **Select the judge demo.** Click **Judge demo · scripted example** in the sidebar. Ordinary users start with their own local source entry; this control is the only entry to the scripted fictional walkthrough.
@@ -43,7 +57,7 @@ The default is in-memory storage. Database files are excluded from Git. Keep the
 7. **Try disagreement.** Open the separate conflicting-note example. Both sources and a neutral clarification question stay visible; the interface does not choose either appointment. Return to the original handoff without losing it.
 8. **Export or reset.** JSON export retains source/version and history information with simulation labels. Reset affects only the current example. Downloaded exports are not removed by reset.
 
-This is a manual, real-service demonstration. No auto-play success, live AI, clinical authentication or medical advice is presented. Refreshing the page starts a fresh UI view; use export to retain a copy.
+This is a manual, real-service demonstration. No auto-play success, clinical authentication or medical advice is presented. Optional AI source navigation is described below. Refreshing the page starts a fresh UI view; use export to retain a copy.
 
 ## Five judging criteria
 
@@ -59,7 +73,8 @@ This is a manual, real-service demonstration. No auto-play success, live AI, cli
 
 Verified locally for this revision:
 
-- **32 Python tests pass** across current domain, storage, rehearsal, HTTP and contract examples.
+- **48 Python tests pass** across current domain, storage, rehearsal, HTTP, contract, and AI assistant examples.
+- **Hosted cloud test suite passes (6 tests)** against the live Vercel + Supabase deployment.
 - **UI-controller integration passes** against an isolated real HTTP service: source inspection, separate assignment/acknowledgement, explicit replacement/cancellation, stale rejection, exact retry, updated review, separate conflict case, offline recovery, safe text and scoped reset.
 - **JavaScript syntax check passes.**
 
@@ -71,11 +86,21 @@ make check
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p "test_*.py"
 node --check app/ui.js
 node tests/test_ui_flow.js
+
+# verify against live hosted production:
+THREAD_TEST_URL=https://thread-caregiver-demo.vercel.app python3 -m unittest tests.test_hosted
 ```
 
-`make run` starts the local demo on port 8000. The Makefile is only a convenience; the explicit commands above show exactly what is being run.
+`make run` starts the local demo on port 8000.
 
-Node is optional for running the application; it is required only for the UI-controller test. The controller test uses a minimal DOM adapter and the actual service, **not a real browser**. The connected browser was unavailable during this UI update, so visual rendering, keyboard usability and assistive-technology behavior have not been verified. Test counts describe these tests only, not full contract compliance or production readiness.
+### Hosted Judge Demo (Vercel + Supabase + NVIDIA NIM)
+
+A live hosted demo configured for judging is accessible at:
+- **Production URL**: `https://thread-caregiver-demo.vercel.app`
+- **Architecture**: Serverless Python on Vercel, session state persisted in Supabase (`thread_demo_sessions`), with AI source navigation powered by NVIDIA NIM (`nvidia/nemotron-3.5-lightning-30b-a3b`).
+- **Safety Boundaries**: Strictly original fictional inputs; read-only medication text without dose or administration calculations; whole-document invalidation when sources change; immutable event logging and stale-write rejection.
+
+Node is optional for running the application; it is required only for the UI-controller test. The controller test uses a minimal DOM adapter and the actual service, **not a real browser**. The updated initial desktop layout was inspected in headless Chromium at 1440 × 1100. Interactive browser flows, mobile rendering, keyboard usability and assistive-technology behavior have not been verified. Test counts describe these tests only, not full contract compliance or production readiness.
 
 Initial invalidation is **whole-document**: unchanged content may also need review. Sources, actor names and scenarios are fictional. An explicit replacement is a claim about a relationship, not authenticated clinical authority. Rehearsal APIs and tests remain in the codebase; the main UI focuses on the transport handoff instead of making practice a prerequisite.
 

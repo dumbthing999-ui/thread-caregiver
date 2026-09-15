@@ -37,18 +37,33 @@ async function run() {
     const get=id=>elements.get(id);
 
     assert.match(get('nextAction').textContent,/Create a local handoff/);
+    assert.equal(get('userMode')['aria-pressed'],'true');
+    assert.equal(get('judgeMode')['aria-pressed'],'false');
+    await action('theme-night');
+    assert.equal(call('theme'),'night','Night theme choice should update the visible theme state');
+    await action('theme-calm');
+    assert.equal(call('theme'),'calm','Calm theme choice should restore the default theme state');
     await action('next');
     assert.equal(get('createDialog').open,true,'The default entry point must be a user handoff, not the scripted demo');
     await action('close');
     assert.equal(call('state.phase'),0);
     await action('demo');
     assert.match(get('modeTag').textContent,/Judge demo/);
+    assert.equal(get('judgeMode')['aria-pressed'],'true');
     await action('next');await action('close');
     assert.equal(call('state.phase'),1);
     const cid=call('state.main.id');
     let snapshot=await (await fetch(origin+`/api/v1/cases/${cid}`)).json();
     assert.equal(snapshot.documents.length,1,'Opening source must not silently import replacement');
+    await action('ai-find');
+    assert.match(get('notice').textContent,/Confirm that these notes are fictional/);
+    // A verified response remains escaped and disappears as soon as its revision changes.
+    call(`state.main.aiResult={etag:state.main.etag, notice:'Read-only source navigation', citations:[{filename:'<img src=x>', source_version:'v1', line:1, exact_quote:'<script>bad()</script>', start_char:0, end_char:22, document_id:state.main.doc1.document_id}]};render()`);
+    assert.match(get('aiResults').innerHTML,/&lt;script&gt;/);
+    assert.ok(!get('aiResults').innerHTML.includes('<script>'));
     await action('next'); // actual source review
+    assert.equal(get('aiResults').innerHTML,'');
+    assert.match(get('aiStatus').textContent,/handoff changed/);
     await action('source');
     assert.match(get('sourceText').innerHTML,/<mark>Follow-up appointment: Thursday at 10:00\.<\/mark>/);
     await action('close');

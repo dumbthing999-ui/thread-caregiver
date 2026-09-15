@@ -21,6 +21,7 @@ import datetime
 import enum
 import hashlib
 import re
+import threading
 import types
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -370,6 +371,7 @@ class ThreadService:
     """Core domain service enforcing invariants, transactions, and boundaries."""
 
     def __init__(self, storage: Optional[Any] = None):
+        self._lock = threading.RLock()
         self.storage = storage
         self.cases: Dict[str, Case] = {}
         self.documents: Dict[str, SourceDocument] = {}
@@ -390,22 +392,24 @@ class ThreadService:
             self.storage.load_into_service(self)
 
     def create_case(self, case_id: Optional[str] = None, fictional_only: bool = True) -> Case:
-        if not fictional_only:
-            raise MalformedRequestError("Service strictly requires fictional_only=true; real PHI prohibited.")
-        cid = case_id or f"case-{uuid.uuid4().hex[:8]}"
-        if cid in self.cases:
-            self.reset_case(cid)
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        c = Case(case_id=cid, state_version=0, created_at=now)
-        self.cases[cid] = c
-        if self.storage:
-            self.storage.persist_case(self, cid)
-        return c
+        with self._lock:
+            if not fictional_only:
+                raise MalformedRequestError("Service strictly requires fictional_only=true; real PHI prohibited.")
+            cid = case_id or f"case-{uuid.uuid4().hex[:8]}"
+            if cid in self.cases:
+                self.reset_case(cid)
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            c = Case(case_id=cid, state_version=0, created_at=now)
+            self.cases[cid] = c
+            if self.storage:
+                self.storage.persist_case(self, cid)
+            return c
 
     def get_case(self, case_id: str) -> Case:
-        if case_id not in self.cases:
-            raise NotFoundError(f"Case '{case_id}' does not exist.")
-        return self.cases[case_id]
+        with self._lock:
+            if case_id not in self.cases:
+                raise NotFoundError(f"Case '{case_id}' does not exist.")
+            return self.cases[case_id]
 
     def validate_preconditions(
         self,
@@ -413,16 +417,17 @@ class ThreadService:
         if_match: Optional[str] = None,
         require_etag: bool = True,
     ) -> Case:
-        c = self.get_case(case_id)
-        if require_etag:
-            if not if_match:
-                raise PreconditionRequiredError("Mutation requires If-Match header with current case ETag.")
-            expected = f'"case-state-{c.state_version}"'
-            if if_match.strip() != expected:
-                raise CaseVersionMismatchError(
-                    f"If-Match '{if_match}' does not match current ETag {expected} (state version {c.state_version})."
-                )
-        return c
+        with self._lock:
+            c = self.get_case(case_id)
+            if require_etag:
+                if not if_match:
+                    raise PreconditionRequiredError("Mutation requires If-Match header with current case ETag.")
+                expected = f'"case-state-{c.state_version}"'
+                if if_match.strip() != expected:
+                    raise CaseVersionMismatchError(
+                        f"If-Match '{if_match}' does not match current ETag {expected} (state version {c.state_version})."
+                    )
+            return c
 
     def _compute_fingerprint(self, method: str, path: str, payload: Any) -> str:
         canonical = f"{method.upper()}:{path}:{sorted_json(payload)}"
@@ -435,15 +440,16 @@ class ThreadService:
         idempotency_key: str,
         fingerprint: str,
     ) -> Optional[CommandReceipt]:
-        key_tuple = (case_id, actor_id, idempotency_key)
-        if key_tuple in self.receipts:
-            prior = self.receipts[key_tuple]
-            if prior.request_fingerprint != fingerprint:
-                raise IdempotencyKeyReusedError(
-                    f"Idempotency key '{idempotency_key}' reused with different operation or payload."
-                )
-            return prior
-        return None
+        with self._lock:
+            key_tuple = (case_id, actor_id, idempotency_key)
+            if key_tuple in self.receipts:
+                prior = self.receipts[key_tuple]
+                if prior.request_fingerprint != fingerprint:
+                    raise IdempotencyKeyReusedError(
+                        f"Idempotency key '{idempotency_key}' reused with different operation or payload."
+                    )
+                return prior
+            return None
 
     def _record_receipt(
         self,
@@ -455,18 +461,19 @@ class ThreadService:
         event_ids: List[str],
         result: Dict[str, Any],
     ) -> CommandReceipt:
-        receipt = CommandReceipt(
-            receipt_id=f"receipt-{uuid.uuid4().hex[:8]}",
-            case_id=case_id,
-            actor_id=actor_id,
-            idempotency_key=idempotency_key,
-            request_fingerprint=fingerprint,
-            committed_state_version=state_version,
-            event_ids=event_ids,
-            result=result,
-        )
-        self.receipts[(case_id, actor_id, idempotency_key)] = receipt
-        return receipt
+        with self._lock:
+            receipt = CommandReceipt(
+                receipt_id=f"receipt-{uuid.uuid4().hex[:8]}",
+                case_id=case_id,
+                actor_id=actor_id,
+                idempotency_key=idempotency_key,
+                request_fingerprint=fingerprint,
+                committed_state_version=state_version,
+                event_ids=event_ids,
+                result=result,
+            )
+            self.receipts[(case_id, actor_id, idempotency_key)] = receipt
+            return receipt
 
     def _append_event(
         self,
@@ -478,26 +485,27 @@ class ThreadService:
         dependency_ids: List[str],
         payload: Dict[str, Any],
     ) -> TaskEvent:
-        c = self.cases[case_id]
-        c.state_version += 1
-        seq = len(self.events) + 1
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        # Deeply freeze payload to guarantee immutability against reader mutation (INV-01, INV-05)
-        safe_payload = freeze_payload(copy.deepcopy(payload))
-        event = TaskEvent(
-            event_id=f"evt-{seq:04d}",
-            case_id=case_id,
-            case_sequence=seq,
-            actor_id=actor_id,
-            event_type=event_type,
-            resource_id=resource_id,
-            resource_revision=resource_revision,
-            dependency_ids=dependency_ids,
-            payload=safe_payload,
-            created_at=now,
-        )
-        self.events.append(event)
-        return event
+        with self._lock:
+            c = self.cases[case_id]
+            c.state_version += 1
+            seq = len(self.events) + 1
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            # Deeply freeze payload to guarantee immutability against reader mutation (INV-01, INV-05)
+            safe_payload = freeze_payload(copy.deepcopy(payload))
+            event = TaskEvent(
+                event_id=f"evt-{seq:04d}",
+                case_id=case_id,
+                case_sequence=seq,
+                actor_id=actor_id,
+                event_type=event_type,
+                resource_id=resource_id,
+                resource_revision=resource_revision,
+                dependency_ids=dependency_ids,
+                payload=safe_payload,
+                created_at=now,
+            )
+            self.events.append(event)
+            return event
 
     def import_document(
         self,
@@ -508,46 +516,55 @@ class ThreadService:
         doc_id: Optional[str] = None,
         source_version: Optional[str] = None,
     ) -> SourceDocument:
-        self.get_case(case_id)
-        # Check input limits (≤ 65,536 bytes plain UTF-8 text)
-        encoded = text.encode("utf-8")
-        if len(encoded) > 65536:
-            raise MalformedRequestError(f"Document exceeds max allowed size of 65,536 bytes (got {len(encoded)}).")
+        with self._lock:
+            self.get_case(case_id)
+            # Check input limits (≤ 65,536 bytes plain UTF-8 text)
+            encoded = text.encode("utf-8")
+            if len(encoded) > 65536:
+                raise MalformedRequestError(f"Document exceeds max allowed size of 65,536 bytes (got {len(encoded)}).")
 
-        # Validate non-plain-text and PDF signatures (FR-01, INV-11)
-        if b"\x00" in encoded[:1024] or encoded.startswith(b"%PDF-") or encoded.startswith(b"\x89PNG"):
-            raise UnsupportedFormatError("Unsupported format: only plain UTF-8 text documents are supported; PDFs and binaries rejected.")
+            # Validate non-plain-text and PDF signatures (FR-01, INV-11)
+            if b"\x00" in encoded[:1024] or encoded.startswith(b"%PDF-") or encoded.startswith(b"\x89PNG"):
+                raise UnsupportedFormatError("Unsupported format: only plain UTF-8 text documents are supported; PDFs and binaries rejected.")
 
-        did = doc_id or f"doc-{uuid.uuid4().hex[:8]}"
-        sver = source_version or "v1"
-        sha = hashlib.sha256(encoded).hexdigest()
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            did = doc_id or f"doc-{uuid.uuid4().hex[:8]}"
+            sver = source_version or "v1"
+            sha = hashlib.sha256(encoded).hexdigest()
 
-        doc = SourceDocument(
-            document_id=did,
-            case_id=case_id,
-            source_version=sver,
-            filename=filename,
-            text=text,
-            sha256=sha,
-            char_count=len(text),
-            created_at=now,
-            uploaded_by=actor_id,
-        )
-        self.documents[did] = doc
+            # Prevent overwriting existing document identity (FR-01, INV-01)
+            if did in self.documents:
+                existing = self.documents[did]
+                if existing.sha256 != sha or existing.source_version != sver:
+                    raise MalformedRequestError(f"Document ID '{did}' already exists with different content or revision.")
+                return existing
 
-        self._append_event(
-            case_id=case_id,
-            actor_id=actor_id,
-            event_type=EventType.SOURCE_ADDED,
-            resource_id=did,
-            resource_revision=sver,
-            dependency_ids=[],
-            payload={"filename": filename, "sha256": sha, "char_count": len(text)},
-        )
-        if self.storage:
-            self.storage.persist_case(self, case_id)
-        return doc
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+            doc = SourceDocument(
+                document_id=did,
+                case_id=case_id,
+                source_version=sver,
+                filename=filename,
+                text=text,
+                sha256=sha,
+                char_count=len(text),
+                created_at=now,
+                uploaded_by=actor_id,
+            )
+            self.documents[did] = doc
+
+            self._append_event(
+                case_id=case_id,
+                actor_id=actor_id,
+                event_type=EventType.SOURCE_ADDED,
+                resource_id=did,
+                resource_revision=sver,
+                dependency_ids=[],
+                payload={"filename": filename, "sha256": sha, "char_count": len(text)},
+            )
+            if self.storage:
+                self.storage.persist_case(self, case_id)
+            return doc
 
     def resolve_anchor(
         self,
@@ -556,46 +573,58 @@ class ThreadService:
         exact_quote: str,
         context_hint: Optional[str] = None,
     ) -> SourceSpan:
-        if document_id not in self.documents:
-            raise NotFoundError(f"Document '{document_id}' not found.")
-        doc = self.documents[document_id]
+        with self._lock:
+            if document_id not in self.documents:
+                raise NotFoundError(f"Document '{document_id}' not found.")
+            doc = self.documents[document_id]
 
-        # Slicing & exact quote lookup
-        occurrences = [m.start() for m in re.finditer(re.escape(exact_quote), doc.text)]
-        if not occurrences:
-            raise ProvenanceInvalidError(f"Exact quotation '{exact_quote}' not found in source document '{document_id}'.")
+            # Slicing & exact quote lookup
+            occurrences = [m.start() for m in re.finditer(re.escape(exact_quote), doc.text)]
+            if not occurrences:
+                raise ProvenanceInvalidError(f"Exact quotation '{exact_quote}' not found in source document '{document_id}'.")
 
-        if len(occurrences) == 1:
-            start_idx = occurrences[0]
-        else:
-            if not context_hint:
-                raise ProvenanceInvalidError(f"Ambiguous quote appears {len(occurrences)} times; context_hint required.")
-            hint_match = doc.text.find(context_hint)
-            if hint_match == -1:
-                raise ProvenanceInvalidError(f"Context hint '{context_hint}' not found in source document.")
-            # find closest occurrence inside or near hint
-            matched_idx = None
-            for idx in occurrences:
-                if hint_match <= idx <= hint_match + len(context_hint):
-                    matched_idx = idx
-                    break
-            if matched_idx is None:
-                raise ProvenanceInvalidError("Cannot disambiguate quote with provided context hint.")
-            start_idx = matched_idx
+            if len(occurrences) == 1:
+                start_idx = occurrences[0]
+            else:
+                if not context_hint:
+                    raise ProvenanceInvalidError(f"Ambiguous quote appears {len(occurrences)} times; context_hint required.")
+                hint_occurrences = [m.start() for m in re.finditer(re.escape(context_hint), doc.text)]
+                if not hint_occurrences:
+                    raise ProvenanceInvalidError(f"Context hint '{context_hint}' not found in source document.")
+                matched_idx = None
+                for h_start in hint_occurrences:
+                    h_end = h_start + len(context_hint)
+                    for idx in occurrences:
+                        if h_start <= idx and (idx + len(exact_quote)) <= h_end:
+                            matched_idx = idx
+                            break
+                    if matched_idx is not None:
+                        break
+                if matched_idx is None:
+                    for h_start in hint_occurrences:
+                        for idx in occurrences:
+                            if abs(idx - h_start) <= max(100, len(context_hint)):
+                                matched_idx = idx
+                                break
+                        if matched_idx is not None:
+                            break
+                if matched_idx is None:
+                    raise ProvenanceInvalidError("Cannot disambiguate quote with provided context hint.")
+                start_idx = matched_idx
 
-        end_idx = start_idx + len(exact_quote)
-        span_id = f"span-{uuid.uuid4().hex[:8]}"
-        span = SourceSpan(
-            span_id=span_id,
-            case_id=case_id,
-            document_id=document_id,
-            source_version=doc.source_version,
-            start_char=start_idx,
-            end_char=end_idx,
-            exact_quote=exact_quote,
-        )
-        self.spans[span_id] = span
-        return span
+            end_idx = start_idx + len(exact_quote)
+            span_id = f"span-{uuid.uuid4().hex[:8]}"
+            span = SourceSpan(
+                span_id=span_id,
+                case_id=case_id,
+                document_id=document_id,
+                source_version=doc.source_version,
+                start_char=start_idx,
+                end_char=end_idx,
+                exact_quote=exact_quote,
+            )
+            self.spans[span_id] = span
+            return span
 
     def review_source(
         self,
@@ -895,108 +924,123 @@ class ThreadService:
         expected_new_version: str,
         actor_id: str = "Morgan",
     ) -> RevisionLink:
-        # Endpoint validation (FR-05, INV-04)
-        if prior_document_id not in self.documents:
-            raise InvalidReplacementError(f"Prior document '{prior_document_id}' does not exist.")
-        if new_document_id not in self.documents:
-            raise InvalidReplacementError(f"New document '{new_document_id}' does not exist.")
-        if prior_document_id == new_document_id:
-            raise InvalidReplacementError("Self-replacement is strictly invalid (prior_document_id == new_document_id).")
+        with self._lock:
+            # Endpoint validation (FR-05, INV-04)
+            if prior_document_id not in self.documents:
+                raise InvalidReplacementError(f"Prior document '{prior_document_id}' does not exist.")
+            if new_document_id not in self.documents:
+                raise InvalidReplacementError(f"New document '{new_document_id}' does not exist.")
+            if prior_document_id == new_document_id:
+                raise InvalidReplacementError("Self-replacement is strictly invalid (prior_document_id == new_document_id).")
 
-        prior_doc = self.documents[prior_document_id]
-        new_doc = self.documents[new_document_id]
-
-        if prior_doc.source_version != expected_prior_version:
-            raise StaleRevisionError(f"Prior document version mismatch: expected '{expected_prior_version}', got '{prior_doc.source_version}'.")
-        if new_doc.source_version != expected_new_version:
-            raise StaleRevisionError(f"New document version mismatch: expected '{expected_new_version}', got '{new_doc.source_version}'.")
-
-        link_id = f"link-{uuid.uuid4().hex[:8]}"
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        link = RevisionLink(
-            link_id=link_id,
-            case_id=case_id,
-            prior_document_id=prior_document_id,
-            new_document_id=new_document_id,
-            asserted_by=actor_id,
-            created_at=now,
-            mapping_policy="DOCUMENT_WIDE",
-        )
-        self.links[link_id] = link
-
-        # Record replacement link event
-        self._append_event(
-            case_id=case_id,
-            actor_id=actor_id,
-            event_type=EventType.REPLACEMENT_LINKED,
-            resource_id=link_id,
-            resource_revision="1",
-            dependency_ids=[prior_document_id, new_document_id],
-            payload={"prior_document_id": prior_document_id, "new_document_id": new_document_id},
-        )
-
-        # Apply DOCUMENT_WIDE invalidation policy (INV-05, INV-06)
-        # Invalidate all tasks and acknowledgements bound to the replaced document
-        invalidated_task_ids = []
-        for tid, task in self.tasks.items():
-            # Find if task depends on instructions in prior_doc
-            depends_on_prior = False
-            for instr_id in task.instruction_ids:
-                instr = self.instructions.get(instr_id)
-                if not instr:
+            # Check for cycle in replacement graph (acyclic invariant INV-04)
+            queue = [new_document_id]
+            visited = set()
+            while queue:
+                curr = queue.pop(0)
+                if curr == prior_document_id:
+                    raise InvalidReplacementError("Circular replacement detected in document revision graph.")
+                if curr in visited:
                     continue
-                for fid in instr.field_ids:
-                    field = self.instruction_fields.get(fid)
-                    if not field:
+                visited.add(curr)
+                for l in self.links.values():
+                    if l.case_id == case_id and l.prior_document_id == curr:
+                        queue.append(l.new_document_id)
+
+            prior_doc = self.documents[prior_document_id]
+            new_doc = self.documents[new_document_id]
+
+            if prior_doc.source_version != expected_prior_version:
+                raise StaleRevisionError(f"Prior document version mismatch: expected '{expected_prior_version}', got '{prior_doc.source_version}'.")
+            if new_doc.source_version != expected_new_version:
+                raise StaleRevisionError(f"New document version mismatch: expected '{expected_new_version}', got '{new_doc.source_version}'.")
+
+            link_id = f"link-{uuid.uuid4().hex[:8]}"
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            link = RevisionLink(
+                link_id=link_id,
+                case_id=case_id,
+                prior_document_id=prior_document_id,
+                new_document_id=new_document_id,
+                asserted_by=actor_id,
+                created_at=now,
+                mapping_policy="DOCUMENT_WIDE",
+            )
+            self.links[link_id] = link
+
+            # Record replacement link event
+            self._append_event(
+                case_id=case_id,
+                actor_id=actor_id,
+                event_type=EventType.REPLACEMENT_LINKED,
+                resource_id=link_id,
+                resource_revision="1",
+                dependency_ids=[prior_document_id, new_document_id],
+                payload={"prior_document_id": prior_document_id, "new_document_id": new_document_id},
+            )
+
+            # Apply DOCUMENT_WIDE invalidation policy (INV-05, INV-06)
+            # Invalidate all tasks and acknowledgements bound to the replaced document
+            invalidated_task_ids = []
+            for tid, task in self.tasks.items():
+                # Find if task depends on instructions in prior_doc
+                depends_on_prior = False
+                for instr_id in task.instruction_ids:
+                    instr = self.instructions.get(instr_id)
+                    if not instr:
                         continue
-                    span = self.spans.get(field.span_id)
-                    if span and span.document_id == prior_document_id:
-                        depends_on_prior = True
-                        break
+                    for fid in instr.field_ids:
+                        field = self.instruction_fields.get(fid)
+                        if not field:
+                            continue
+                        span = self.spans.get(field.span_id)
+                        if span and span.document_id == prior_document_id:
+                            depends_on_prior = True
+                            break
 
-            if depends_on_prior:
-                proj = self.task_projections[tid]
-                proj.validity = Validity.STALE
-                proj.status = TaskState.STALE
-                c = self.cases[case_id]
-                proj.state_version = c.state_version
-                invalidated_task_ids.append(tid)
+                if depends_on_prior:
+                    proj = self.task_projections[tid]
+                    proj.validity = Validity.STALE
+                    proj.status = TaskState.STALE
+                    c = self.cases[case_id]
+                    proj.state_version = c.state_version
+                    invalidated_task_ids.append(tid)
 
-                self._append_event(
-                    case_id=case_id,
-                    actor_id="system",
-                    event_type=EventType.INVALIDATED,
-                    resource_id=tid,
-                    resource_revision=task.task_revision,
-                    dependency_ids=[link_id],
-                    payload={"reason": "DOCUMENT_WIDE_REPLACEMENT", "prior_document_id": prior_document_id},
-                )
+                    self._append_event(
+                        case_id=case_id,
+                        actor_id="system",
+                        event_type=EventType.INVALIDATED,
+                        resource_id=tid,
+                        resource_revision=task.task_revision,
+                        dependency_ids=[link_id],
+                        payload={"reason": "DOCUMENT_WIDE_REPLACEMENT", "prior_document_id": prior_document_id},
+                    )
 
-        # Invalidate rehearsal projections for items tied to prior document (FR-08, INV-05, INV-10)
-        for (item_id, act_id), rproj in self.rehearsal_projections.items():
-            ritem = self.rehearsals.get(item_id)
-            if not ritem:
-                continue
-            rinstr = self.instructions.get(ritem.instruction_id)
-            if not rinstr:
-                continue
-            depends = False
-            for fid in rinstr.field_ids:
-                field = self.instruction_fields.get(fid)
-                if field:
-                    span = self.spans.get(field.span_id)
-                    if span and span.document_id == prior_document_id:
-                        depends = True
-                        break
-            if depends:
-                rproj.state = RehearsalState.NEEDS_REREVIEW
-                rproj.validity = Validity.STALE
-                c = self.cases[case_id]
-                rproj.state_version = c.state_version
+            # Invalidate rehearsal projections for items tied to prior document (FR-08, INV-05, INV-10)
+            for (item_id, act_id), rproj in self.rehearsal_projections.items():
+                ritem = self.rehearsals.get(item_id)
+                if not ritem:
+                    continue
+                rinstr = self.instructions.get(ritem.instruction_id)
+                if not rinstr:
+                    continue
+                depends = False
+                for fid in rinstr.field_ids:
+                    field = self.instruction_fields.get(fid)
+                    if field:
+                        span = self.spans.get(field.span_id)
+                        if span and span.document_id == prior_document_id:
+                            depends = True
+                            break
+                if depends:
+                    rproj.state = RehearsalState.NEEDS_REREVIEW
+                    rproj.validity = Validity.STALE
+                    c = self.cases[case_id]
+                    rproj.state_version = c.state_version
 
-        if self.storage:
-            self.storage.persist_case(self, case_id)
-        return link
+            if self.storage:
+                self.storage.persist_case(self, case_id)
+            return link
 
     def create_rehearsal_item(
         self,

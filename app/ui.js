@@ -2,9 +2,26 @@
 // UI state is kept per tab; service-issued case/document IDs never reuse the shared demo fixtures.
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const quoteOf = doc => doc?.text.split(/\r?\n/).find(line => line.startsWith('Follow-up appointment:')) || '';
-const timeOf = doc => quoteOf(doc).replace(/^Follow-up appointment:\s*/, '').replace(/\.$/, '');
-const state = {phase:0, busy:false, connected:true, main:null, conflict:null, view:'main', confirmation:null, returnFocus:null, checks:[], mode:'user'};
+const quoteOf = doc => {
+  if (!doc?.text) return '';
+  const lines = doc.text.split(/\r?\n/);
+  return lines.find(line => /^\s*(?:Follow-up appointment:|Follow-up:|Appointment:)/i.test(line))?.trim() || '';
+};
+const timeOf = doc => quoteOf(doc).replace(/^\s*(?:Follow-up appointment:|Follow-up:|Appointment:)\s*/i, '').replace(/\.$/, '');
+const hosted = window.THREAD_HOSTED === true;
+const state = {phase:0, busy:false, connected:true, main:null, conflict:null, view:'main', confirmation:null, returnFocus:null, checks:[], mode:hosted?'demo':'user'};
+let theme = 'calm';
+try { theme = localStorage.getItem('thread-theme') || 'calm'; } catch {}
+if(theme !== 'night') theme = 'calm';
+function applyTheme(nextTheme) {
+  theme = nextTheme === 'night' ? 'night' : 'calm';
+  document.documentElement?.setAttribute('data-theme', theme);
+  try { localStorage.setItem('thread-theme', theme); } catch {}
+}
+applyTheme(theme);
+if(hosted){
+  try{const saved=JSON.parse(sessionStorage.getItem('thread-demo-view')||'null');if(saved)Object.assign(state,saved,{busy:false,connected:false,confirmation:null,returnFocus:null});}catch{}
+}
 const active = () => state.view === 'conflict' ? state.conflict : state.main;
 const messages = [
   ['START WITH YOUR SOURCE','Create a handoff from the source you already have.','Paste a fictional appointment note, review the exact wording, and keep transport responsibility connected to its source.','Create a local handoff','The scripted judge walkthrough is available from the sidebar.'],
@@ -16,12 +33,16 @@ const messages = [
   ['04 · RE-REVIEW NEEDED','The old acknowledgement is no longer current.','The source changed. Review the new wording and reconfirm transport responsibility before acknowledging the updated handoff.','Review and acknowledge update','Whole-document re-review: unchanged content may need review too.'],
   ['HANDOFF UPDATED','The review now points to the updated wording.','Morgan has acknowledged the new source. The earlier acknowledgement is still in history and remains stale. Transport has not been marked completed.','View the recorded history','Explore the evidence below to test old writes and duplicate requests.']
 ];
+if(hosted){
+  messages[0]=['LIVE FICTIONAL DEMO','A new note. A clearer handoff.','Try a fictional appointment change. Review the source, take transport responsibility, then see what needs attention when the wording changes.','Open fictional example','Your example is isolated by a secure session cookie. Access expires after 24 hours.'];
+  messages[2][4]='Morgan is a simulated caregiver. No ride is booked or message sent.';
+}
 const eventLabels = {SOURCE_ADDED:'Source note added',REVIEW_RECORDED:'Source wording reviewed',TASK_CREATED:'Coordination task created',OWNER_CONFIRMED:'Morgan took responsibility',ACKNOWLEDGED:'Wording acknowledged',REPLACEMENT_LINKED:'Claimed replacement recorded',INVALIDATED:'Earlier review needs updating',COMPLETED:'Coordination task completed',ISSUE_OPENED:'Conflicting wording flagged',REHEARSAL_CREATED:'Source practice created',REHEARSAL_ATTEMPTED:'Source practice recorded'};
 
 async function request(path, {method='GET', body, headers={}, expect}={}) {
   let response;
   try {response = await fetch(path, {method, headers:{'Content-Type':'application/json', ...headers}, ...(body === undefined ? {} : {body:JSON.stringify(body)})});}
-  catch {state.connected=false; throw new Error('Cannot reach the local service. Your last view may be out of date. Reconnect before continuing.');}
+  catch {state.connected=false; throw new Error('Cannot reach the service. Your last view may be out of date. Reconnect before continuing.');}
   const data = await response.json();
   if (expect) {
     if(response.status !== expect.status || data.error?.code !== expect.code) throw new Error(`The service check did not return ${expect.code}. No successful protection check was recorded.`);
@@ -48,7 +69,9 @@ function notify(message, type='success') {
 function modal(id) {state.returnFocus=document.activeElement; $(id).showModal();}
 function closeModal() {const dialog=document.querySelector('dialog[open]'); if(dialog) dialog.close(); state.returnFocus?.focus();}
 function render() {
+  if(hosted&&!state.busy){try{const {phase,main,conflict,view,checks,mode}=state;sessionStorage.setItem('thread-demo-view',JSON.stringify({phase,main,conflict,view,checks,mode}));}catch{}}
   const ctx=active(); const m=state.main; const phase=state.phase; const conflict=state.view==='conflict';
+  renderAssistant(ctx);
   const next=messages[phase];
   $('nextEyebrow').textContent=conflict?'SEPARATE FICTIONAL EXAMPLE':next[0];
   $('nextTitle').textContent=conflict?'When sources disagree, leave the question open.':next[1];
@@ -59,7 +82,12 @@ function render() {
   $('stepLabel').textContent=conflict?'CONFLICT CONTROL':`0${step+1} / 04`;
   [...$('progress').children].forEach((li,i)=>{li.removeAttribute('aria-current'); li.className=i<step?'done':''; if(i===step)li.setAttribute('aria-current','step');});
   $('nextAction').disabled=state.busy||!state.connected;
-  $('modeTag').textContent=state.mode==='demo'?'Judge demo · fictional':'Local workspace';
+  $('modeTag').textContent=state.mode==='demo'?'Judge demo · fictional':'User mode';
+  $('userMode').setAttribute('aria-pressed',String(state.mode==='user'));
+  $('judgeMode').setAttribute('aria-pressed',String(state.mode==='demo'));
+  $('modeDescription').textContent=state.mode==='demo'?'Walk through an isolated, scripted fictional example.':'Start a handoff from your own fictional note.';
+  $('theme-calm').setAttribute('aria-pressed',String(theme==='calm'));
+  $('theme-night').setAttribute('aria-pressed',String(theme==='night'));
   $('sourceButton').disabled=!m||state.busy;
   $('historyButton').disabled=!ctx;
   $('exportButton').disabled=!ctx||state.busy||!state.connected;
@@ -69,7 +97,7 @@ function render() {
   $('conflictButton').disabled=state.busy||!state.connected;
   document.body.classList.toggle('busy',state.busy);
   $('offline').hidden=state.connected;
-  $('connectionStatus').textContent=!state.connected?'Offline · Saved view may be out of date':ctx?'Local service connected · Roles simulated':'Local demo · Open an example to connect';
+  $('connectionStatus').textContent=!state.connected?'Offline · Saved view may be out of date':ctx?(hosted?'Live demo · Saved in Supabase · Roles simulated':'Local service connected · Roles simulated'):(hosted?'Vercel + Supabase · Set up through Composio':'Local demo · Open an example to connect');
   const currentDoc=m?.linked?m.doc2:m?.doc1;
   $('appointmentTime').textContent=currentDoc?timeOf(currentDoc):'Your source, in context.';
   $('appointmentCaption').textContent=currentDoc?'Fictional follow-up · Transport coordination only':'Open the fictional example to inspect its exact wording.';
@@ -96,6 +124,32 @@ function render() {
   $('activity').innerHTML=history.length?history.slice(-4).reverse().map(e=>`<li>${esc(eventLabels[e.event_type]||e.event_type)}<small>${esc(e.actor_id)} · Event ${esc(e.case_sequence)}</small></li>`).join(''):'<li class="empty-activity">Your first action will appear here. Earlier events stay in history when a source changes.</li>';
   $('checkResults').innerHTML=state.checks.length?state.checks.map(message=>`<li>${esc(message)}</li>`).join(''):'<li>No service checks run yet.</li>';
 }
+function renderAssistant(ctx) {
+  const button=$('aiButton');
+  button.disabled=!ctx || state.busy || !state.connected;
+  button.textContent=state.busy?'Please wait…':'Find source passages';
+  const result=ctx?.aiResult;
+  const current=result && result.etag===ctx.etag;
+  $('aiResults').innerHTML=current?result.citations.map(c=>`<article class="ai-citation"><span class="small-label">${esc(c.filename)} · ${esc(c.source_version)} · Line ${esc(c.line)}</span><blockquote>${esc(c.exact_quote)}</blockquote><p class="helper">Characters ${c.start_char}–${c.end_char} · Read-only source text</p><button class="text-button" data-ai-source="${esc(c.document_id)}">Inspect original ↗</button></article>`).join(''):'';
+  $('aiStatus').textContent=!ctx?'Open a handoff to get started. AI is optional.':result&&!current?'The handoff changed. Run the finder again to refresh its source links.':current?result.notice:'Ready when you are. Only request AI for fictional notes.';
+}
+async function findSourcePassages() {
+  const ctx=active(); if(!ctx)return;
+  if(!$('aiConsent').checked)throw new Error('Confirm that these notes are fictional and may be sent to NVIDIA.');
+  ctx.aiResult=null;
+  $('aiResults').innerHTML='';
+  $('aiStatus').textContent='Finding source passages… This can take up to 30 seconds.';
+  await sync(ctx);
+  const result=await post(ctx,'/ai/source-finder',{fictional_only:true,etag:ctx.etag});
+  await sync(ctx);
+  if(result.etag!==ctx.etag)throw new Error('The handoff changed. Run the source finder again.');
+  ctx.aiResult=result;
+  notify('Source passages found. Inspect the originals before recording any review.');
+}
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-ai-source]');
+  if(button)showSource(active()?.snapshot?.documents.find(d=>d.document_id===button.dataset.aiSource));
+});
 function showSource(doc) {
   if(!doc)return;
   const ctx=active();
@@ -145,7 +199,7 @@ async function createUserHandoff() {
   const text=$('sourceInput').value.trim();
   const filename=$('sourceFilename').value.trim()||'My appointment note.txt';
   if(!text)throw new Error('Add the source wording before creating the handoff.');
-  if(!quoteOf({text}))throw new Error('Include a line beginning “Follow-up appointment:” so the appointment can be quoted exactly.');
+  if(!quoteOf({text}))throw new Error('Include a line beginning “Follow-up appointment:” or “Appointment:” so the appointment can be quoted exactly.');
   const result=await request('/api/v1/sessions',{method:'POST',body:{fictional_only:true}});
   state.main={id:result.case_id,etag:result.etag,history:[]};
   const ctx=state.main;
@@ -191,13 +245,15 @@ async function dispatch(action) {
   if(action==='about'){modal('aboutDialog');return;}
   if(action==='history'){showHistory();return;}
   if(action==='demo'){state.mode='demo';render();notify('Judge demo selected. This opens the scripted fictional example.','warning');return;}
+  if(action==='user-mode'){state.mode='user';render();notify('User mode selected. Add a fictional source note to start your own handoff.');return;}
+  if(action==='theme-calm'||action==='theme-night'){applyTheme(action==='theme-night'?'night':'calm');render();return;}
   if(action==='handoff'||action==='return'){state.view='main';render();$('main').focus();return;}
   if(action==='source'){showSource(state.main?.linked?state.main.doc2:state.main?.doc1);return;}
   if(action==='source-old'){showSource(state.main?.doc1);return;}
   if(action==='source-new'){showSource(state.main?.doc2);return;}
   if(action==='conflict-a'||action==='conflict-b'){showSource(action==='conflict-a'?state.conflict?.doc_a:state.conflict?.doc_b);return;}
   if(state.busy)return;
-  if(action==='reset'){if(!active())return;state.confirmation='reset';$('confirmTitle').textContent='Reset this fictional example?';$('confirmDescription').textContent='This removes this example’s source notes and event history from the local service. Any JSON file you already downloaded remains on your device.';$('confirmAction').textContent='Reset example';modal('confirmDialog');return;}
+  if(action==='reset'){if(!active())return;state.confirmation='reset';$('confirmTitle').textContent='Reset this fictional example?';$('confirmDescription').textContent='This removes this example’s source notes and event history from the service. Any JSON file you already downloaded remains on your device.';$('confirmAction').textContent='Reset example';modal('confirmDialog');return;}
   if(action==='create'){
     state.busy=true;render();
     try{await createUserHandoff();}catch(error){notify(error.message,'error');}
@@ -206,7 +262,8 @@ async function dispatch(action) {
   }
   state.busy=true;render();
   try {
-    if(action==='next')await nextStep();
+    if(action==='ai-find')await findSourcePassages();
+    else if(action==='next')await nextStep();
     else if(action==='confirm')await confirmAction();
     else if(action==='stale')await testStale();
     else if(action==='retry')await testRetry();
@@ -221,3 +278,5 @@ window.addEventListener('offline',()=>{state.connected=false;render();});
 window.addEventListener('online',()=>{notify('Connection may be available again. Use Reconnect to refresh the service state.','warning');});
 document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('close',()=>state.returnFocus?.focus()));
 render();
+
+if(hosted&&active()){dispatch('reconnect');}

@@ -1,0 +1,2 @@
+# Optional: the core handoff runs without this dependency.
+openai>=2.0,<3
